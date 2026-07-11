@@ -5,6 +5,8 @@ import dotenv from 'dotenv';
 import { initContextEngine } from './engine/context';
 import contextRoutes from './routes/context.routes';
 import scenarioRoutes from './routes/scenarios.routes';
+import reasoningRoutes from './routes/reasoning.routes';
+import decisionsRoutes from './routes/decisions.routes';
 import { failure } from './utils/response';
 
 // Load environment variables from .env file
@@ -44,6 +46,12 @@ app.use('/api/context', contextRoutes);
 
 // Scenario mutations
 app.use('/api/scenarios', scenarioRoutes);
+
+// AI Reasoning Pipeline — Phase 3A debug scaffold (kept for low-level inspection)
+app.use('/api/reasoning', reasoningRoutes);
+
+// AI Decision Pipeline — Phase 3B (Output Validator → Confidence → Memory → Orchestrator)
+app.use('/api/decisions', decisionsRoutes);
 
 // ─── Global Error Handler ────────────────────────────────────────────────────
 // Catches any unhandled errors from route handlers and returns a consistent
