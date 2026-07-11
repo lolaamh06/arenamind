@@ -1,0 +1,310 @@
+{
+  "metadata": {
+    "name": "Solara Arena",
+    "city": "Riverbend City",
+    "totalCapacity": 67500,
+    "currentAttendance": 61420,
+    "matchName": "Group Stage — Match 38",
+    "homeTeam": "Atlético Dorado",
+    "awayTeam": "FC Nordvik",
+    "matchPhase": "second-half",
+    "simulatedTime": "2026-07-14T20:52:00Z"
+  },
+
+  "gates": [
+    {
+      "id": "gate-a",
+      "displayName": "Gate A — North Stand",
+      "occupancyPercent": 42,
+      "trend": "stable",
+      "queueEstimate": 110,
+      "riskLevel": "low",
+      "servedSections": ["101", "102", "103", "104", "105", "106"]
+    },
+    {
+      "id": "gate-b",
+      "displayName": "Gate B — North-East Corner",
+      "occupancyPercent": 58,
+      "trend": "stable",
+      "queueEstimate": 230,
+      "riskLevel": "low",
+      "servedSections": ["107", "108", "109", "110", "111"]
+    },
+    {
+      "id": "gate-c",
+      "displayName": "Gate C — East Stand",
+      "occupancyPercent": 74,
+      "trend": "increasing",
+      "queueEstimate": 510,
+      "riskLevel": "moderate",
+      "servedSections": ["112", "113", "114", "115", "116", "117"]
+    },
+    {
+      "id": "gate-d",
+      "displayName": "Gate D — South-East Corner",
+      "occupancyPercent": 81,
+      "trend": "increasing",
+      "queueEstimate": 780,
+      "riskLevel": "high",
+      "servedSections": ["118", "119", "120", "121"]
+    },
+    {
+      "id": "gate-e",
+      "displayName": "Gate E — South Stand",
+      "occupancyPercent": 55,
+      "trend": "decreasing",
+      "queueEstimate": 195,
+      "riskLevel": "low",
+      "servedSections": ["122", "123", "124", "125", "126"]
+    },
+    {
+      "id": "gate-f",
+      "displayName": "Gate F — South-West Corner",
+      "occupancyPercent": 38,
+      "trend": "stable",
+      "queueEstimate": 85,
+      "riskLevel": "low",
+      "servedSections": ["127", "128", "129", "130"]
+    },
+    {
+      "id": "gate-g",
+      "displayName": "Gate G — West Stand",
+      "occupancyPercent": 67,
+      "trend": "stable",
+      "queueEstimate": 340,
+      "riskLevel": "moderate",
+      "servedSections": ["131", "132", "133", "134", "135"]
+    },
+    {
+      "id": "gate-h",
+      "displayName": "Gate H — North-West Corner",
+      "occupancyPercent": 29,
+      "trend": "decreasing",
+      "queueEstimate": 60,
+      "riskLevel": "low",
+      "servedSections": ["136", "137", "138", "139", "140"]
+    }
+  ],
+
+  "weather": {
+    "condition": "cloudy",
+    "temperatureCelsius": 22,
+    "rainIntensity": 0,
+    "windSpeedKph": 14,
+    "comfortIndicator": "comfortable"
+  },
+
+  "transport": {
+    "hubs": [
+      {
+        "id": "hub-north-metro",
+        "name": "North Metro Station",
+        "type": "metro",
+        "status": "busy",
+        "occupancyPercent": 71,
+        "estimatedWaitMinutes": 8
+      },
+      {
+        "id": "hub-south-bus",
+        "name": "South Bus Terminal",
+        "type": "bus",
+        "status": "normal",
+        "occupancyPercent": 44,
+        "estimatedWaitMinutes": 5
+      },
+      {
+        "id": "hub-east-taxi",
+        "name": "East Rideshare Drop-off",
+        "type": "taxi-rideshare",
+        "status": "busy",
+        "occupancyPercent": null,
+        "estimatedWaitMinutes": 12
+      },
+      {
+        "id": "hub-west-parking",
+        "name": "West Parking Complex",
+        "type": "parking",
+        "status": "normal",
+        "occupancyPercent": 88,
+        "estimatedWaitMinutes": 3
+      }
+    ],
+    "generalAdvisory": "Normal operations. North Metro Station experiencing moderate crowd — consider South Bus Terminal as an alternative."
+  },
+
+  "accessibilityAssets": [
+    {
+      "id": "acc-elev-a1",
+      "assetType": "elevator",
+      "status": "operational",
+      "locationReference": "gate-a",
+      "displayLocation": "Gate A — North Stand, Level 1",
+      "waitEstimateMinutes": 2
+    },
+    {
+      "id": "acc-ramp-b1",
+      "assetType": "ramp",
+      "status": "operational",
+      "locationReference": "gate-b",
+      "displayLocation": "Gate B — North-East Corner",
+      "waitEstimateMinutes": null
+    },
+    {
+      "id": "acc-elev-c1",
+      "assetType": "elevator",
+      "status": "out-of-service",
+      "locationReference": "gate-c",
+      "displayLocation": "Gate C — East Stand, Level 2",
+      "waitEstimateMinutes": null
+    },
+    {
+      "id": "acc-restroom-e1",
+      "assetType": "accessible-restroom",
+      "status": "operational",
+      "locationReference": "gate-e",
+      "displayLocation": "Gate E — South Stand, Concourse Level",
+      "waitEstimateMinutes": 1
+    },
+    {
+      "id": "acc-entrance-f1",
+      "assetType": "accessible-entrance",
+      "status": "busy",
+      "locationReference": "gate-f",
+      "displayLocation": "Gate F — South-West Corner, Priority Lane",
+      "waitEstimateMinutes": 6
+    },
+    {
+      "id": "acc-elev-g1",
+      "assetType": "elevator",
+      "status": "operational",
+      "locationReference": "gate-g",
+      "displayLocation": "Gate G — West Stand, Level 1",
+      "waitEstimateMinutes": 3
+    }
+  ],
+
+  "medicalResources": {
+    "availableMedics": 14,
+    "totalMedics": 16,
+    "availableAmbulances": 4,
+    "totalAmbulances": 4,
+    "stations": [
+      {
+        "id": "med-station-north",
+        "locationReference": "gate-a",
+        "displayLocation": "North Medical Centre — Gate A Corridor"
+      },
+      {
+        "id": "med-station-south",
+        "locationReference": "gate-e",
+        "displayLocation": "South Medical Centre — Gate E Corridor"
+      },
+      {
+        "id": "med-station-east",
+        "locationReference": "gate-c",
+        "displayLocation": "East Medical Post — Gate C Concourse"
+      }
+    ],
+    "activeMedicalIncidents": 0
+  },
+
+  "volunteers": [
+    {
+      "id": "vol-001",
+      "displayName": "Priya Nair",
+      "assignedZone": "Gate A",
+      "status": "available",
+      "currentTask": "Monitoring crowd flow at Gate A entry"
+    },
+    {
+      "id": "vol-002",
+      "displayName": "Carlos Mendoza",
+      "assignedZone": "Gate B",
+      "status": "assigned",
+      "currentTask": "Directing fans to overflow seating in Sections 109–111"
+    },
+    {
+      "id": "vol-003",
+      "displayName": "Aisha Bello",
+      "assignedZone": "Gate C",
+      "status": "available",
+      "currentTask": "Monitoring Gate C queue; flagged for potential escalation"
+    },
+    {
+      "id": "vol-004",
+      "displayName": "Tobias Eriksen",
+      "assignedZone": "Gate D",
+      "status": "assigned",
+      "currentTask": "Managing queue barriers at Gate D South-East entrance"
+    },
+    {
+      "id": "vol-005",
+      "displayName": "Lena Fischer",
+      "assignedZone": "Gate E",
+      "status": "available",
+      "currentTask": "Assisting fans with South Stand seating directions"
+    },
+    {
+      "id": "vol-006",
+      "displayName": "Kwame Asante",
+      "assignedZone": "Gate F",
+      "status": "on-break",
+      "currentTask": "On scheduled break — returns 21:05 UTC"
+    },
+    {
+      "id": "vol-007",
+      "displayName": "Mei-Ling Zhou",
+      "assignedZone": "Gate G",
+      "status": "available",
+      "currentTask": "Monitoring Gate G concourse foot traffic"
+    },
+    {
+      "id": "vol-008",
+      "displayName": "Ravi Sharma",
+      "assignedZone": "Gate H",
+      "status": "available",
+      "currentTask": "Supporting North-West Corner accessibility passengers"
+    },
+    {
+      "id": "vol-009",
+      "displayName": "Sofia Demarco",
+      "assignedZone": "North Metro Station",
+      "status": "assigned",
+      "currentTask": "Guiding fans from North Metro Station to stadium entrance"
+    },
+    {
+      "id": "vol-010",
+      "displayName": "Ahmed Hassan",
+      "assignedZone": "South Bus Terminal",
+      "status": "available",
+      "currentTask": "Coordinating bus arrivals at South Bus Terminal"
+    },
+    {
+      "id": "vol-011",
+      "displayName": "Ingrid Larsson",
+      "assignedZone": "Concourse — Central",
+      "status": "off-duty",
+      "currentTask": "Off duty — shift ends at 19:00 UTC"
+    },
+    {
+      "id": "vol-012",
+      "displayName": "Damilola Adeyemi",
+      "assignedZone": "Gate C",
+      "status": "available",
+      "currentTask": "Assisting with accessible entrance operations at Gate C"
+    }
+  ],
+
+  "incidents": [
+    {
+      "id": "inc-001",
+      "incidentType": "equipment-failure",
+      "severity": "low",
+      "locationReference": "gate-c",
+      "displayLocation": "Gate C — East Stand, Level 2",
+      "reportedAt": "2026-07-14T20:31:00Z",
+      "status": "monitoring",
+      "description": "Elevator C1 (Gate C, Level 2) has gone out of service. Maintenance notified. Passengers being redirected to Gate B elevator and Gate C ramp."
+    }
+  ]
+}
