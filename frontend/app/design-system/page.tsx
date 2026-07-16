@@ -22,91 +22,143 @@ import { NotificationToast } from '../../components/molecules/NotificationToast'
 
 import { DecisionBrief } from '../../components/organisms/DecisionBrief';
 import { StadiumTwinPreview } from '../../components/organisms/StadiumTwinPreview';
-import { FanBottomNav } from '../../components/organisms/FanBottomNav';
 import { OperationsSidebar } from '../../components/organisms/OperationsSidebar';
 import { PageContainer } from '../../components/organisms/PageContainer';
-import { AIDecisionBrief } from '../../types/decision-brief';
-import { Severity } from '../../types';
+import { Severity, DecisionBrief as ApiDecisionBrief } from '../../types';
 
-// Mock Decision Brief dataset with varying severity/audiences
-const sampleBriefs: Record<Severity, AIDecisionBrief> = {
+// Mock Decision Brief dataset with varying severity/audiences mapped to new schema
+const sampleBriefs: Record<Severity, ApiDecisionBrief> = {
   critical: {
     id: 'db-1',
-    title: 'Gate C Turnstile Mechanical Defect',
-    severity: 'critical',
-    situationSummary: 'Gate C queue times have exceeded 35 minutes due to a localized turnstile mechanical failure combined with a surge in arrivals from the Metro transit corridor.',
+    trigger: {
+      triggerType: 'manual-request',
+      reference: 'gate-c',
+      triggeredAt: new Date().toISOString(),
+    },
+    generatedAt: new Date().toISOString(),
+    isValid: true,
     recommendation: 'Divert oncoming Metro arrivals to Gate D and dispatch 4 additional volunteers to Gate C for crowd management.',
+    reasoning: 'Sensor logs verify turnstile #4 mechanical blockage at Gate C. Arrival rate at Gate C is currently 220 people/minute, exceeding normal capacity by 45%. Gate D is running at 30% capacity and is located 250m west, presenting the optimal path to clear the bottleneck before kickoff.',
     evidence: [
-      { label: 'Gate C Sensors', category: 'gates' },
-      { label: 'Turnstile #4 Error', category: 'incidents' },
-      { label: 'Metro Surge', category: 'transport' },
+      'Gate C occupancy is at 95% with a CRITICAL risk and increasing trend',
+      'Turnstile #4 mechanical blockage reported at Gate C',
+      'Transit corridor metro surge of 3200 incoming spectators',
     ],
-    confidence: { percentage: 94, label: 'High Confidence' },
-    explanation: 'Sensor logs verify turnstile #4 mechanical blockage at Gate C. Arrival rate at Gate C is currently 220 people/minute, exceeding normal capacity by 45%. Gate D is running at 30% capacity and is located 250m west, presenting the optimal path to clear the bottleneck before kickoff.',
-    alternativesConsidered: [
-      { label: 'Hold arrivals at Metro exit gates', reason: 'Would cause dangerous crowd build-up at transit platforms.' },
-      { label: 'Open emergency gate C-West', reason: 'C-West is currently reserved for medical emergency access and lacks turnstile scanners.' },
+    urgency: 'critical',
+    suggestedActions: [
+      'Instruct volunteers Sarah and John to deploy crowd control barriers 50m before Gate C entrance',
+      'Update concourse messaging boards to guide incoming Metro passengers to Gate D',
+      'Dispatch maintenance team to inspect and repair Turnstile #4',
     ],
-    timestamp: '14:23 UTC',
-    audience: 'operations',
+    confidence: {
+      score: 94,
+      tier: 'high',
+      breakdown: [
+        { factor: 'base_score', impact: 100, reason: 'Starting confidence score.' },
+        { factor: 'repair_needed', impact: -6, reason: 'Minor API formatting warning.' },
+      ],
+    },
+    validationErrors: [],
+    evidenceWarnings: [],
+    contradictionWarning: null,
   },
   warning: {
     id: 'db-2',
-    title: 'Approaching Heavy Thunderstorm Front',
-    severity: 'warning',
-    situationSummary: 'Doppler radar reports a localized thunderstorm front moving northeast, expected to impact the stadium perimeter with heavy rain and gusty winds starting in 15 minutes.',
+    trigger: {
+      triggerType: 'scenario-mutation',
+      reference: 'global',
+      triggeredAt: new Date().toISOString(),
+    },
+    generatedAt: new Date().toISOString(),
+    isValid: true,
     recommendation: 'Activate perimeter canopy shelters, prompt volunteers to distribute rain ponchos, and notify fans of transit boarding gate coverages.',
+    reasoning: 'Doppler radar reports a localized thunderstorm front moving northeast, expected to impact the stadium perimeter with heavy rain and gusty winds starting in 15 minutes.',
     evidence: [
-      { label: 'Doppler Radar', category: 'weather' },
-      { label: 'Wind Gauge Node 3', category: 'weather' },
+      'Doppler Radar reports rain probability 90%',
+      'Wind Gauge Node 3 reports gusts up to 45 km/h',
     ],
-    confidence: { percentage: 76, label: 'Moderate Confidence' },
-    explanation: 'Storm movement tracking indicates a 90% probability of rain within the immediate stadium zip code starting at 14:40 UTC. Outdoor concourse traffic is currently 8,000, creating shelter demand.',
-    alternativesConsidered: [
-      { label: 'Instruct outdoor areas evacuation', reason: 'Premature and would trigger panic before storm onset.' },
+    urgency: 'high',
+    suggestedActions: [
+      'Deploy canopy shelters around Concourse zones A and B',
+      'Distribute weather ponchos to outdoor mobile volunteers',
     ],
-    timestamp: '14:25 UTC',
-    audience: 'fan',
+    confidence: {
+      score: 76,
+      tier: 'moderate',
+      breakdown: [
+        { factor: 'base_score', impact: 100, reason: 'Starting confidence score.' },
+        { factor: 'sparse_signals', impact: -24, reason: 'Low number of inputs.' },
+      ],
+    },
+    validationErrors: [],
+    evidenceWarnings: [],
+    contradictionWarning: null,
   },
   normal: {
     id: 'db-3',
-    title: 'Metro Concourse Congestion Warning',
-    severity: 'normal',
-    situationSummary: 'Commuter volume at the Stadium-East Metro platform is rising steadily due to consecutive arriving trains, showing slight departure delays.',
+    trigger: {
+      triggerType: 'periodic-scan',
+      reference: 'global',
+      triggeredAt: new Date().toISOString(),
+    },
+    generatedAt: new Date().toISOString(),
+    isValid: true,
     recommendation: 'Recommend fans utilize the North Transit Hub buses or walk to West Stadium Metro station to bypass platform cues.',
+    reasoning: 'Commuter volume at the Stadium-East Metro platform is rising steadily due to consecutive arriving trains, showing slight departure delays.',
     evidence: [
-      { label: 'Metro Platform Cameras', category: 'transport' },
-      { label: 'Bus Schedule Feeds', category: 'transport' },
+      'Platform occupancy at Stadium-East Metro is exceeding 85%',
+      'Bus Corridor shuttle interval is stable at 4 minutes',
     ],
-    confidence: { percentage: 89, label: 'High Confidence' },
-    explanation: 'Historical exit volumes show that during peak game transitions, bus shuttle corridors offer a 12-minute faster return time when East Metro queues exceed 200 meters.',
-    alternativesConsidered: [],
-    timestamp: '14:28 UTC',
-    audience: 'volunteer',
+    urgency: 'moderate',
+    suggestedActions: [
+      'Update mobile assistant app with route bypass options',
+    ],
+    confidence: {
+      score: 89,
+      tier: 'high',
+      breakdown: [],
+    },
+    validationErrors: [],
+    evidenceWarnings: [],
+    contradictionWarning: null,
   },
   resolved: {
     id: 'db-4',
-    title: 'Elevator E-2 Power Reset Complete',
-    severity: 'resolved',
-    situationSummary: 'Elevator E-2 serving Sector 4 accessibility suites was reported offline due to a transient power trip. Support technicians have resolved the issue.',
+    trigger: {
+      triggerType: 'manual-request',
+      reference: 'elevator-e2',
+      triggeredAt: new Date().toISOString(),
+    },
+    generatedAt: new Date().toISOString(),
+    isValid: true,
     recommendation: 'Restore Elevator E-2 to active service status on the Digital Twin and resume standard accessible routing indicators.',
+    reasoning: 'Elevator E-2 serving Sector 4 accessibility suites was reported offline due to a transient power trip. Support technicians have resolved the issue.',
     evidence: [
-      { label: 'Elevator Status Node', category: 'gates' },
-      { label: 'Grid Feed 3', category: 'incidents' },
+      'Elevator E-2 voltage feedback stabilized at 240V',
     ],
-    confidence: { percentage: 99, label: 'High Confidence' },
-    explanation: 'Grid diagnostic feedback confirms voltage readings have stabilized, and system self-tests completed successfully with zero error codes.',
-    alternativesConsidered: [],
-    timestamp: '14:15 UTC',
-    audience: 'operations',
+    urgency: 'low',
+    suggestedActions: [
+      'Update accessibility state indicator on operations dashboard',
+    ],
+    confidence: {
+      score: 99,
+      tier: 'high',
+      breakdown: [],
+    },
+    validationErrors: [],
+    evidenceWarnings: [],
+    contradictionWarning: null,
   },
 };
+
+import LiveTestDashboard from '../../components/organisms/LiveTestDashboard';
 
 export default function DesignSystemPreview() {
   // Component test states
   const [themeMode, setThemeMode] = useState<'light' | 'dark'>('dark');
   const [highContrast, setHighContrast] = useState(false);
   const [largeFont, setLargeFont] = useState(false);
+  const [showLivePanel, setShowLivePanel] = useState(true);
 
   const [inputText, setInputText] = useState('');
   const [inputError, setInputError] = useState('');
@@ -156,6 +208,13 @@ export default function DesignSystemPreview() {
             </p>
           </div>
           <div className="flex items-center gap-3">
+            <Button
+              variant={showLivePanel ? 'primary' : 'secondary'}
+              size="sm"
+              onClick={() => setShowLivePanel(!showLivePanel)}
+            >
+              Toggle Live Wiring Panel: <span className="font-bold ml-1 uppercase">{showLivePanel ? 'ON' : 'OFF'}</span>
+            </Button>
             <Button variant="secondary" size="sm" onClick={toggleTheme}>
               Active Theme: <span className="font-bold ml-1 uppercase">{themeMode}</span>
             </Button>
@@ -167,6 +226,13 @@ export default function DesignSystemPreview() {
             />
           </div>
         </div>
+
+        {/* Live Wiring Panel Section */}
+        {showLivePanel && (
+          <div className="mb-12">
+            <LiveTestDashboard />
+          </div>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
           {/* Main Display Grid */}
@@ -387,22 +453,7 @@ export default function DesignSystemPreview() {
                   <h3 className="text-sm font-semibold text-text-secondary mb-3">StadiumTwinPreview</h3>
                   <StadiumTwinPreview />
                 </div>
-                <div className="space-y-4">
-                  <h3 className="text-sm font-semibold text-text-secondary">Next.js Navigation Bar Previews</h3>
-                  <div className="bg-bg-secondary p-4 rounded-medium border border-border-color">
-                    <span className="text-xs font-semibold text-text-muted block mb-4 font-mono">[FanBottomNav (Visible on mobile/tablet widths)]</span>
-                    <div className="relative border border-border-color p-2 bg-bg-card rounded h-24 overflow-hidden">
-                      <div className="absolute inset-x-0 bottom-0">
-                        {/* Render inline representation of bottom nav */}
-                        <div className="flex justify-around items-center h-16 bg-bg-card border-t border-border-color">
-                          <span className="text-xs text-primary-600 font-bold">Home</span>
-                          <span className="text-xs text-text-secondary">Navigate</span>
-                          <span className="text-xs text-text-secondary">Assistant</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+
               </div>
             </section>
           </div>
@@ -429,8 +480,7 @@ export default function DesignSystemPreview() {
         />
       )}
       
-      {/* Absolute Bottom Navigation rendering (fixed on page bottom for testing on small screens) */}
-      <FanBottomNav />
+
     </div>
   );
 }

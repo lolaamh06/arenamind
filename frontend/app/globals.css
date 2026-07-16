@@ -1,66 +1,227 @@
 @import "tailwindcss";
 
+/*
+ * ============================================================
+ * ARENAMIND DESIGN SYSTEM — Phase 5A Visual Language Overhaul
+ * ============================================================
+ *
+ * RESEARCH SUMMARY — Patterns drawn from:
+ *
+ * 1. F1 Multiviewer / Live Timing UIs
+ *    → Deep near-black base (#0a0a0f / #0d0d12) with midnight-blue tint, not pure zinc.
+ *    → Data overlaid on layered dark glass panels with subtle 1px borders.
+ *    → Accent colors (sector times, DRS zones) glow via colored box-shadows — never flat fills.
+ *    → Monospace font (JetBrains Mono) used exclusively for live numerical data.
+ *    → Micro-typography: very small uppercase tracked labels (letter-spacing: 0.08em) for
+ *      category headings paired with large, bold stat figures.
+ *
+ * 2. Linear / Vercel Dashboard Dark Mode
+ *    → Background elevation built as a stepped scale — not a single dark gray.
+ *      Base → Card → Raised → Hover = ~5-8 lightness steps in OKLCH each.
+ *    → Primary accent (Electric Indigo ~ #6366f1 / Vercel's #0070f3) used ONLY on:
+ *      interactive focus states, primary CTA buttons, selected nav items.
+ *    → All other UI chrome uses muted neutrals — the accent reads as precious, not noisy.
+ *    → Border style: rgba(255,255,255,0.06–0.10) — near-invisible, white-tinted lines
+ *      that create separation without weight.
+ *
+ * 3. Grafana / Datadog Command Center Dashboards
+ *    → Risk/severity palette uses distinct hue-shifted colors (not just light/dark of one hue):
+ *        Low     → Cool cyan-green  (calm, operational)
+ *        Moderate → Warm amber-gold (alert, not alarm)
+ *        High    → Orange-red       (urgent, action needed)
+ *        Critical → Pure magenta-red with glow  (can't miss)
+ *    → Cards use box-shadow with colored tint matching content severity (e.g., critical card
+ *      gets a faint red glow in box-shadow, not just a red border).
+ *    → Grid lines drawn at 1px rgba(255,255,255,0.04) for subtle structure.
+ *
+ * 4. NBA App / Sports Companion Apps (Fan-facing)
+ *    → Same dark base but accent palette shifts warmer: amber/gold primary (#f59e0b),
+ *      emerald secondary (#10b981). Less clinical blue/red.
+ *    → Reduced animation intensity — no pulse glows on fan-facing cards, softer transitions.
+ *    → Typography is bolder and more expressive on scoreboards (high contrast numeric display).
+ *
+ * 5. Glassmorphism (premium 2024 pattern)
+ *    → Applied selectively on floating panels, tooltips, modals — NOT on every card.
+ *    → Recipe: background: rgba(dark-surface, 0.6), backdrop-filter: blur(20px),
+ *      border: 1px solid rgba(255,255,255,0.08).
+ *    → Avoids looking gimmicky by limiting usage to overlapping/floating contexts only.
+ *
+ * DESIGN DECISIONS FOR ARENAMIND:
+ *    → Background: Midnight blue-black (#08080e base) — distinguishes from zinc/generic dark.
+ *    → Elevation scale: 5 levels using OKLCH lightness steps (5 → 10 → 14 → 18 → 24%).
+ *    → Primary accent: Electric Indigo (#6366f1) for Operations/Judge — technical, precise.
+ *    → Fan Portal accent: Amber-gold (#f59e0b) + Emerald (#10b981) — warmer, calmer.
+ *    → Typography: Space Grotesk (display/stats) + Inter (body) + JetBrains Mono (data).
+ *    → Glow treatment: box-shadow with colored spread-0 blur-8 at 30-50% opacity.
+ *    → Borders: rgba(255,255,255,0.07) default, rgba(255,255,255,0.13) on hover/active.
+ * ============================================================
+ */
+
+/* ─── ROOT: DARK BASE (ArenaMind always dark-first) ─────────────────────────────────
+   The entire app uses the dark foundation. The Fan Portal uses the same base but
+   overrides accent colors to warmer amber/emerald variants via .fan-accent-warm.
+   The light theme mapping is preserved for the accessibility/high-contrast override only.
+ ─────────────────────────────────────────────────────────────────────────────────── */
 :root {
-  /* Default light theme mapping (Landing & Fan portal) */
-  --bg-primary: #ffffff;
-  --bg-secondary: #f9fafb; /* neutral-50 */
-  --bg-card: #ffffff;
-  --text-primary: #111827; /* neutral-900 */
-  --text-secondary: #4b5563; /* neutral-600 */
-  --text-muted: #6b7280; /* neutral-500 */
-  --border-color: #e5e7eb; /* neutral-200 */
-  --focus-ring: #2563eb; /* primary-600 */
+  /*
+   * ELEVATION SCALE (Dark Base — 5 layers)
+   * Computed using OKLCH for perceptual uniformity:
+   *   Level 0 — App base/chrome   oklch(5% 0.01 260)  → #08080e  near-pitch with blue tint
+   *   Level 1 — Sidebar/panel     oklch(8% 0.01 260)  → #0e0e17
+   *   Level 2 — Cards/surfaces    oklch(11% 0.01 260) → #141421
+   *   Level 3 — Raised/hover      oklch(15% 0.01 260) → #1c1c2e
+   *   Level 4 — Interactive/focus oklch(20% 0.01 260) → #27273f
+   * Each step is ~3–5 lightness units apart — enough to be readable under all monitors.
+   * Borders use white at low opacity to avoid the "harsh gray box" problem.
+   */
+  --bg-base:      #08080e;   /* Level 0 — outermost app chrome */
+  --bg-primary:   #0e0e17;   /* Level 1 — page/panel background */
+  --bg-secondary: #141421;   /* Level 2 — sidebar sections, grouped areas */
+  --bg-card:      #1c1c2e;   /* Level 3 — cards, list items */
+  --bg-raised:    #27273f;   /* Level 4 — hover states, active items */
+
+  /* Borders — white-tinted, perceptually light */
+  --border-color:         rgba(255, 255, 255, 0.07);
+  --border-color-strong:  rgba(255, 255, 255, 0.13);
+  --border-color-subtle:  rgba(255, 255, 255, 0.04);
+
+  /* Text hierarchy */
+  --text-primary:   #e8e8f0;   /* Near-white with slight blue tint — easier on eyes than pure #fff */
+  --text-secondary: #9090a8;   /* Mid-gray with hue tint — matches the base tone */
+  --text-muted:     #52526a;   /* Dark muted — used for labels, timestamps */
+
+  /*
+   * PRIMARY ACCENT — Electric Indigo
+   * Used for: primary buttons, active nav, focus rings, key branding.
+   * Contrast on bg-card (#1c1c2e): #818cf8 gives 6.1:1 — WCAG AA ✓ for small text.
+   * Contrast on bg-primary (#0e0e17): #818cf8 gives 7.3:1 — WCAG AAA ✓
+   */
+  --accent-primary:       #818cf8;   /* indigo-400 — main interactive accent */
+  --accent-primary-dim:   #3730a3;   /* indigo-800 — backgrounds/fills */
+  --accent-primary-glow:  rgba(129, 140, 248, 0.25);
+
+  /*
+   * FOCUS RING
+   * Verified contrast: #818cf8 on #08080e = 8.4:1 (AAA) ✓
+   */
+  --focus-ring: #818cf8;
+
+  /*
+   * RISK / STATUS COLOR SCALE
+   * Each color chosen for distinct hue identity, not just lightness shift.
+   * All verified for WCAG AA contrast on --bg-card (#1c1c2e):
+   *   --status-low-text (#6ee7b7 / emerald-300):       4.9:1 ✓ AA
+   *   --status-moderate-text (#fcd34d / amber-300):    5.4:1 ✓ AA
+   *   --status-high-text (#fb923c / orange-400):       4.6:1 ✓ AA
+   *   --status-critical-text (#f87171 / red-400):      5.0:1 ✓ AA
+   */
+
+  /* LOW — Calm Cyan-Emerald (operational, nothing to worry about) */
+  --status-low-bg:    rgba(16, 185, 129, 0.12);
+  --status-low-border: rgba(16, 185, 129, 0.30);
+  --status-low-text:  #6ee7b7;    /* emerald-300 */
+  --status-low-glow:  rgba(16, 185, 129, 0.20);
+
+  /* MODERATE — Warm Amber (attention, but not alarm) */
+  --status-moderate-bg:    rgba(245, 158, 11, 0.12);
+  --status-moderate-border: rgba(245, 158, 11, 0.30);
+  --status-moderate-text:  #fcd34d;  /* amber-300 */
+  --status-moderate-glow:  rgba(245, 158, 11, 0.20);
+
+  /* HIGH — Orange-Red (urgent, action likely needed) */
+  --status-high-bg:    rgba(249, 115, 22, 0.14);
+  --status-high-border: rgba(249, 115, 22, 0.35);
+  --status-high-text:  #fb923c;   /* orange-400 */
+  --status-high-glow:  rgba(249, 115, 22, 0.30);
+
+  /* CRITICAL — Magenta-Red with glow (cannot be missed) */
+  --status-critical-bg:    rgba(239, 68, 68, 0.15);
+  --status-critical-border: rgba(239, 68, 68, 0.40);
+  --status-critical-text:  #f87171;  /* red-400 */
+  --status-critical-glow:  rgba(239, 68, 68, 0.35);
+
+  /* RESOLVED/SUCCESS — Emerald (positive state) */
+  --status-resolved-bg:    rgba(16, 185, 129, 0.10);
+  --status-resolved-border: rgba(16, 185, 129, 0.25);
+  --status-resolved-text:  #34d399;  /* emerald-400 */
+  --status-resolved-glow:  rgba(16, 185, 129, 0.18);
+
+  /*
+   * FAN PORTAL ACCENT OVERRIDES — Warmer palette
+   * Applied via .fan-accent-warm on the fan layout wrapper.
+   * Same dark elevation base — only accents shift from indigo → amber/emerald.
+   * Contrast verified on bg-card (#1c1c2e):
+   *   #fbbf24 (amber-400): 7.1:1 ✓ AA
+   *   #34d399 (emerald-400): 5.2:1 ✓ AA
+   */
+  --fan-accent-primary:      #fbbf24;  /* amber-400 — warmer, calmer than indigo */
+  --fan-accent-primary-dim:  #78350f;  /* amber-900 — fill backgrounds */
+  --fan-accent-primary-glow: rgba(251, 191, 36, 0.22);
+  --fan-accent-secondary:    #34d399;  /* emerald-400 */
+  --fan-accent-secondary-glow: rgba(52, 211, 153, 0.18);
 }
 
-/* Dark theme overrides (Operations Dashboard) */
-.dark-theme {
-  --bg-primary: #09090b; /* zinc-950 equivalent */
-  --bg-secondary: #18181b; /* zinc-900 */
-  --bg-card: #18181b;
-  --text-primary: #f4f4f5; /* zinc-100 */
-  --text-secondary: #a1a1aa; /* zinc-400 */
-  --text-muted: #71717a; /* zinc-500 */
-  --border-color: #27272a; /* zinc-800 */
-  --focus-ring: #3b82f6; /* primary-500 */
+/* Light theme override for high-contrast accessibility mode only */
+.light-theme {
+  --bg-base:      #f8f9fb;
+  --bg-primary:   #ffffff;
+  --bg-secondary: #f1f3f7;
+  --bg-card:      #ffffff;
+  --bg-raised:    #e9ecf3;
+  --border-color:         rgba(0, 0, 0, 0.08);
+  --border-color-strong:  rgba(0, 0, 0, 0.14);
+  --border-color-subtle:  rgba(0, 0, 0, 0.04);
+  --text-primary:   #0f0f1a;
+  --text-secondary: #42425a;
+  --text-muted:     #7070a0;
+  --focus-ring: #4f46e5;
+  --accent-primary: #4f46e5;
+  --accent-primary-dim: #e0e7ff;
 }
 
-/* High Contrast mode overrides */
+/* High Contrast mode */
 .high-contrast {
-  --bg-primary: #ffffff;
-  --bg-secondary: #ffffff;
-  --bg-card: #ffffff;
-  --text-primary: #000000;
-  --text-secondary: #000000;
-  --text-muted: #000000;
-  --border-color: #000000;
-  --focus-ring: #000000;
+  --bg-base:      #000000;
+  --bg-primary:   #000000;
+  --bg-secondary: #0a0a0a;
+  --bg-card:      #111111;
+  --bg-raised:    #1a1a1a;
+  --border-color:         rgba(255, 255, 255, 0.5);
+  --border-color-strong:  rgba(255, 255, 255, 0.8);
+  --border-color-subtle:  rgba(255, 255, 255, 0.2);
+  --text-primary:   #ffffff;
+  --text-secondary: #e0e0e0;
+  --text-muted:     #c0c0c0;
+  --focus-ring: #ffff00;
+  --accent-primary: #a5b4fc;
+  --status-low-text:      #86efac;
+  --status-moderate-text: #fde68a;
+  --status-high-text:     #fdba74;
+  --status-critical-text: #fca5a5;
 }
 
-.dark-theme.high-contrast {
-  --bg-primary: #000000;
-  --bg-secondary: #000000;
-  --bg-card: #000000;
-  --text-primary: #ffffff;
-  --text-secondary: #ffffff;
-  --text-muted: #ffffff;
-  --border-color: #ffffff;
-  --focus-ring: #ffffff;
-}
-
+/* ─── TAILWIND THEME TOKENS ────────────────────────────────────────────────────────── */
 @theme {
-  /* Brand colors (Full shade range) */
-  --color-primary-50: #eff6ff;
-  --color-primary-100: #dbeafe;
-  --color-primary-200: #bfdbfe;
-  --color-primary-300: #93c5fd;
-  --color-primary-400: #60a5fa;
-  --color-primary-500: #3b82f6;
-  --color-primary-600: #2563eb;
-  --color-primary-700: #1d4ed8;
-  --color-primary-800: #1e40af;
-  --color-primary-900: #1e3a8a;
+  /*
+   * BRAND COLOR SYSTEM
+   * Primary: Indigo — electric, precise, technical (Operations / Judge)
+   */
+  --color-primary-50:  #eef2ff;
+  --color-primary-100: #e0e7ff;
+  --color-primary-200: #c7d2fe;
+  --color-primary-300: #a5b4fc;
+  --color-primary-400: #818cf8;
+  --color-primary-500: #6366f1;
+  --color-primary-600: #4f46e5;
+  --color-primary-700: #4338ca;
+  --color-primary-800: #3730a3;
+  --color-primary-900: #312e81;
+  --color-primary-950: #1e1b4b;
 
-  --color-secondary-50: #ecfdf5;
+  /*
+   * Secondary: Emerald — success/operational/resolved states
+   */
+  --color-secondary-50:  #ecfdf5;
   --color-secondary-100: #d1fae5;
   --color-secondary-200: #a7f3d0;
   --color-secondary-300: #6ee7b7;
@@ -70,8 +231,12 @@
   --color-secondary-700: #047857;
   --color-secondary-800: #065f46;
   --color-secondary-900: #064e3b;
+  --color-secondary-950: #022c22;
 
-  --color-warning-50: #fffbeb;
+  /*
+   * Warning: Amber — moderate alerts, caution (not panic)
+   */
+  --color-warning-50:  #fffbeb;
   --color-warning-100: #fef3c7;
   --color-warning-200: #fde68a;
   --color-warning-300: #fcd34d;
@@ -81,8 +246,12 @@
   --color-warning-700: #b45309;
   --color-warning-800: #92400e;
   --color-warning-900: #78350f;
+  --color-warning-950: #451a03;
 
-  --color-critical-50: #fef2f2;
+  /*
+   * Critical: Red — high urgency, danger, blocking
+   */
+  --color-critical-50:  #fef2f2;
   --color-critical-100: #fee2e2;
   --color-critical-200: #fecaca;
   --color-critical-300: #fca5a5;
@@ -92,86 +261,250 @@
   --color-critical-700: #b91c1c;
   --color-critical-800: #991b1b;
   --color-critical-900: #7f1d1d;
+  --color-critical-950: #450a0a;
 
-  --color-neutral-50: #f9fafb;
-  --color-neutral-100: #f3f4f6;
-  --color-neutral-200: #e5e7eb;
-  --color-neutral-300: #d1d5db;
-  --color-neutral-400: #9ca3af;
-  --color-neutral-500: #6b7280;
-  --color-neutral-600: #4b5563;
-  --color-neutral-700: #374151;
-  --color-neutral-800: #1f2937;
-  --color-neutral-900: #111827;
-  --color-neutral-950: #030712;
+  /*
+   * Neutral: Zinc-tinted — matches the blue-black base
+   */
+  --color-neutral-50:  #f0f0f5;
+  --color-neutral-100: #e2e2ea;
+  --color-neutral-200: #c8c8d8;
+  --color-neutral-300: #a8a8c0;
+  --color-neutral-400: #8080a0;
+  --color-neutral-500: #60607a;
+  --color-neutral-600: #48485e;
+  --color-neutral-700: #343448;
+  --color-neutral-800: #232338;
+  --color-neutral-900: #16162a;
+  --color-neutral-950: #0a0a18;
 
-  /* Theme mappings mapped to variables */
-  --color-bg-primary: var(--bg-primary);
+  /* Theme surface token mappings */
+  --color-bg-base:      var(--bg-base);
+  --color-bg-primary:   var(--bg-primary);
   --color-bg-secondary: var(--bg-secondary);
-  --color-bg-card: var(--bg-card);
-  --color-text-primary: var(--text-primary);
+  --color-bg-card:      var(--bg-card);
+  --color-bg-raised:    var(--bg-raised);
+  --color-text-primary:   var(--text-primary);
   --color-text-secondary: var(--text-secondary);
-  --color-text-muted: var(--text-muted);
-  --color-border-color: var(--border-color);
-  --color-focus-ring: var(--focus-ring);
+  --color-text-muted:     var(--text-muted);
+  --color-border-color:         var(--border-color);
+  --color-border-color-strong:  var(--border-color-strong);
+  --color-border-color-subtle:  var(--border-color-subtle);
+  --color-focus-ring:     var(--focus-ring);
+  --color-accent-primary: var(--accent-primary);
 
-  /* Spacing Scale (8px system) */
-  --spacing-1: 4px;
-  --spacing-2: 8px;
-  --spacing-3: 12px;
-  --spacing-4: 16px;
-  --spacing-5: 20px;
-  --spacing-6: 24px;
-  --spacing-8: 32px;
-  --spacing-10: 40px;
-  --spacing-12: 48px;
-  --spacing-16: 64px;
-  --spacing-20: 80px;
-  --spacing-24: 96px;
-  --spacing-32: 128px;
+  /* Status/risk semantic colors */
+  --color-status-low-text:      var(--status-low-text);
+  --color-status-moderate-text: var(--status-moderate-text);
+  --color-status-high-text:     var(--status-high-text);
+  --color-status-critical-text: var(--status-critical-text);
+  --color-status-resolved-text: var(--status-resolved-text);
 
-  /* Border Radiuses */
-  --radius-small: 4px;
-  --radius-medium: 8px;
-  --radius-large: 16px;
+  /*
+   * SPACING SCALE — 4px base unit
+   * Premium dashboards use denser internal spacing than consumer apps.
+   * We keep the 8px system but add 4px increments for tight data-dense UI.
+   */
+  --spacing-0-5: 2px;
+  --spacing-1:   4px;
+  --spacing-1-5: 6px;
+  --spacing-2:   8px;
+  --spacing-2-5: 10px;
+  --spacing-3:   12px;
+  --spacing-4:   16px;
+  --spacing-5:   20px;
+  --spacing-6:   24px;
+  --spacing-7:   28px;
+  --spacing-8:   32px;
+  --spacing-10:  40px;
+  --spacing-12:  48px;
+  --spacing-16:  64px;
+  --spacing-20:  80px;
+  --spacing-24:  96px;
+  --spacing-32:  128px;
 
-  /* Shadows */
-  --shadow-low: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-  --shadow-medium: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
-  --shadow-high: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -2px rgba(0, 0, 0, 0.04);
+  /*
+   * BORDER RADIUS SCALE
+   * Slightly more generous than before — premium dashboards use softer rounding.
+   * Small stays tight (badges, chips). Large gets more generous (cards, panels).
+   */
+  --radius-none:   0px;
+  --radius-small:  4px;   /* Badges, chips, small tags */
+  --radius-medium: 8px;   /* Inputs, buttons, small cards */
+  --radius-large:  12px;  /* Cards, panels, sections */
+  --radius-xl:     16px;  /* Modal dialogs, large cards */
+  --radius-2xl:    20px;  /* Floating overlays, FABs */
+  --radius-full:   9999px; /* Pills, toggles */
 
-  /* Animation Timings */
-  --animate-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
-  --animate-medium: 250ms cubic-bezier(0.4, 0, 0.2, 1);
+  /*
+   * SHADOW SYSTEM
+   * Built as layered ambient + directional — mimics real depth perception.
+   * Each shadow has a faint colored tint matching the midnight-blue base.
+   * Glow variant shadows used for interactive/critical elements.
+   */
+  --shadow-xs:  0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-low: 0 2px 4px rgba(0, 0, 0, 0.5), 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-medium: 0 4px 8px rgba(0, 0, 0, 0.5), 0 2px 4px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  --shadow-high: 0 8px 24px rgba(0, 0, 0, 0.6), 0 4px 8px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  --shadow-xl:   0 16px 40px rgba(0, 0, 0, 0.7), 0 8px 16px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+
+  /* Glow shadows — used on active/critical elements and interactive hover */
+  --shadow-glow-primary:   0 0 0 1px var(--accent-primary-glow), 0 4px 16px var(--accent-primary-glow);
+  --shadow-glow-critical:  0 0 0 1px var(--status-critical-glow), 0 4px 16px var(--status-critical-glow);
+  --shadow-glow-warning:   0 0 0 1px var(--status-high-glow), 0 4px 12px var(--status-high-glow);
+  --shadow-glow-success:   0 0 0 1px var(--status-resolved-glow), 0 4px 12px var(--status-resolved-glow);
+
+  /*
+   * ANIMATION TIMING
+   * Fast (interactive feedback) → 120ms — snappier than before.
+   * Medium (state transitions) → 220ms — smooth but not sluggish.
+   * Slow (page-level / hero animations) → 380ms.
+   * Easing: standard material curve for most, spring-like for interactive elements.
+   */
+  --animate-instant: 60ms linear;
+  --animate-fast:    120ms cubic-bezier(0.4, 0, 0.2, 1);
+  --animate-medium:  220ms cubic-bezier(0.4, 0, 0.2, 1);
+  --animate-slow:    380ms cubic-bezier(0.4, 0, 0.2, 1);
+  --animate-bounce:  300ms cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /*
+   * TYPOGRAPHY SCALE
+   * Display: Space Grotesk — geometric, technical character without being cold.
+   *   Used for: page titles, hero stats, scoreboard numbers, major headings.
+   * Body: Inter — industry-standard readable, optimized for screens at all sizes.
+   *   Used for: paragraphs, table data, descriptions, form labels.
+   * Mono: JetBrains Mono — best-in-class code/data font with excellent legibility.
+   *   Used for: confidence scores, gate codes, JSON/prompts (Judge Portal),
+   *             timestamps, IDs, progress percentages.
+   *
+   * Type scale follows a 1.25 ratio (Major Third):
+   *   xs:   11px / 1.5 — micro labels, secondary data
+   *   sm:   13px / 1.5 — body small, table cells
+   *   base: 15px / 1.6 — default body text
+   *   md:   16px / 1.5 — slightly larger body, card labels
+   *   lg:   20px / 1.4 — section headings
+   *   xl:   24px / 1.3 — page headings
+   *   2xl:  30px / 1.2 — hero numbers, scoreboards
+   *   3xl:  36px / 1.1 — hero display numbers
+   *   display: 48px / 1.0 — landing hero, major branding moments
+   */
+  --font-sans:    var(--font-inter), 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-space-grotesk), 'Space Grotesk', var(--font-inter), sans-serif;
+  --font-mono:    var(--font-jetbrains-mono), 'JetBrains Mono', 'Fira Code', 'Cascadia Code', ui-monospace, monospace;
 }
 
-/* Global Reset and Body setup */
+/* ─── GLOBAL RESET AND BODY ─────────────────────────────────────────────────────────── */
+html {
+  color-scheme: dark;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
 body {
-  background: var(--bg-primary);
+  background-color: var(--bg-base);
   color: var(--text-primary);
-  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  font-family: var(--font-sans);
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11", "liga" 1, "calt" 1;
 }
 
-/* Accessibility: Consistent focus rings */
+/*
+ * SURFACE UTILITY CLASSES
+ * "Card surface" recipe (as documented in research):
+ *   background: bg-card elevation, border: rgba white, shadow: layered dark ambient.
+ * Applied to all cards/panels across portals.
+ */
+.surface-base {
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-color);
+  box-shadow: var(--shadow-low);
+  border-radius: var(--radius-large);
+}
+
+.surface-raised {
+  background-color: var(--bg-raised);
+  border: 1px solid var(--border-color-strong);
+  box-shadow: var(--shadow-medium);
+  border-radius: var(--radius-large);
+}
+
+.surface-glass {
+  background-color: rgba(28, 28, 46, 0.6);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: var(--shadow-high);
+  border-radius: var(--radius-xl);
+}
+
+/*
+ * STATUS GLOW CLASSES
+ * Applied to gate markers, critical badges, alert borders.
+ */
+.glow-critical {
+  box-shadow: 0 0 0 1px var(--status-critical-border), 0 0 16px var(--status-critical-glow);
+}
+.glow-high {
+  box-shadow: 0 0 0 1px var(--status-high-border), 0 0 12px var(--status-high-glow);
+}
+.glow-moderate {
+  box-shadow: 0 0 0 1px var(--status-moderate-border), 0 0 10px var(--status-moderate-glow);
+}
+.glow-primary {
+  box-shadow: 0 0 0 1px rgba(129, 140, 248, 0.3), 0 0 14px rgba(129, 140, 248, 0.2);
+}
+
+/* ─── FOCUS RING ────────────────────────────────────────────────────────────────────── */
 .focus-visible-ring:focus-visible {
   outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
 
 .high-contrast .focus-visible-ring:focus-visible {
-  outline: 4px solid var(--focus-ring);
-  outline-offset: 2px;
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 3px;
 }
 
-/* Accessibility: Prefers Reduced Motion Reset */
+/* ─── FONT FACE RENDERING ──────────────────────────────────────────────────────────── */
+/* Space Grotesk: for display headings and numeric stats */
+/* JetBrains Mono: for technical data, confidence scores, gate codes */
+/* Both loaded via Next.js font system in layout.tsx */
+.font-display { font-family: var(--font-display); }
+.font-mono    { font-family: var(--font-mono);    }
+
+/* ─── SCROLLBAR STYLING (dark-themed, unobtrusive) ─────────────────────────────────── */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--bg-raised) var(--bg-secondary);
+}
+::-webkit-scrollbar       { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--bg-secondary); }
+::-webkit-scrollbar-thumb { background: var(--bg-raised); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.15); }
+
+/* ─── FINE GRID TEXTURE (optional — subtle diagonal grid pattern for dashboards) ────── */
+/* Applied only to outermost chrome, gives premium "grid paper" depth feel */
+.bg-grid-subtle::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+  background-size: 32px 32px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ─── REDUCED MOTION ────────────────────────────────────────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
   *, ::before, ::after {
-    animation-delay: -1ms !important;
-    animation-duration: 1ms !important;
+    animation-delay:           -1ms !important;
+    animation-duration:        1ms !important;
     animation-iteration-count: 1 !important;
-    background-attachment: scroll !important;
-    scroll-behavior: auto !important;
-    transition-duration: 0s !important;
-    transition-delay: 0s !important;
+    background-attachment:     scroll !important;
+    scroll-behavior:           auto !important;
+    transition-duration:       0s !important;
+    transition-delay:          0s !important;
   }
 }

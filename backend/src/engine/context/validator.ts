@@ -8,6 +8,7 @@
  *
  * Rules enforced:
  *
+ * ── Phase 2 rules (original) ──────────────────────────────────────────────
  * 1. Attendance ≤ totalCapacity (hard clamp).
  * 2. Gate occupancyPercent clamped to [0, 100].
  * 3. Gate riskLevel derived from occupancyPercent + trend:
@@ -21,11 +22,35 @@
  * 6. availableAmbulances clamped to [0, totalAmbulances].
  * 7. Weather.rainIntensity is 0 when condition is "clear" or "cloudy".
  *
+ * ── Phase 4C-1 additions ──────────────────────────────────────────────────
+ * 8.  matchInfo.homeScore and awayScore must be non-negative integers
+ *     (clamped to ≥ 0 and floored to nearest integer).
+ * 9.  matchInfo.matchMinute clamped to [0, MAX_MATCH_MINUTE] (99 minutes,
+ *     allowing for regulation + standard stoppage time).
+ * 10. Every amenity.status must be one of "open" | "busy" | "closed".
+ *     Invalid values are reset to "open" with a warning log.
+ * 11. Every amenity.type must be one of "food" | "beverage" | "merchandise".
+ *     Invalid values are logged as a warning (entry left as-is since
+ *     TS type narrowing should prevent this at compile time).
+ *
  * The validate() function is pure — it returns a corrected copy and never
  * mutates its input.
  */
 
 import type { StadiumContext, Gate, RiskLevel } from '../../types';
+
+/**
+ * Maximum match minute allowed by the validator and scenario mutations.
+ * 99 covers 90 minutes regulation + up to 9 minutes of injury/stoppage time,
+ * which is realistic for a tense group-stage match.
+ */
+export const MAX_MATCH_MINUTE = 99;
+
+/** Set of valid AmenityStatus values — kept here for runtime guard. */
+const VALID_AMENITY_STATUSES = new Set(['open', 'busy', 'closed']);
+
+/** Set of valid AmenityType values — kept here for runtime guard. */
+const VALID_AMENITY_TYPES = new Set(['food', 'beverage', 'merchandise']);
 
 // ─── Rule helpers ────────────────────────────────────────────────────────────
 
@@ -126,6 +151,54 @@ export function validate(ctx: StadiumContext): StadiumContext {
       c.weather.rainIntensity = 0;
     }
   }
+
+  // ── Phase 4C-1 rules ───────────────────────────────────────────────────────
+
+  // Rule 8: homeScore and awayScore must be non-negative integers.
+  const homeScore = Math.max(0, Math.floor(c.matchInfo.homeScore));
+  if (homeScore !== c.matchInfo.homeScore) {
+    console.warn(
+      `[Validator] matchInfo.homeScore ${c.matchInfo.homeScore} is invalid. Correcting to ${homeScore}.`,
+    );
+    c.matchInfo.homeScore = homeScore;
+  }
+  const awayScore = Math.max(0, Math.floor(c.matchInfo.awayScore));
+  if (awayScore !== c.matchInfo.awayScore) {
+    console.warn(
+      `[Validator] matchInfo.awayScore ${c.matchInfo.awayScore} is invalid. Correcting to ${awayScore}.`,
+    );
+    c.matchInfo.awayScore = awayScore;
+  }
+
+  // Rule 9: matchMinute clamped to [0, MAX_MATCH_MINUTE].
+  const clampedMinute = clamp(c.matchInfo.matchMinute, 0, MAX_MATCH_MINUTE);
+  if (clampedMinute !== c.matchInfo.matchMinute) {
+    console.warn(
+      `[Validator] matchInfo.matchMinute ${c.matchInfo.matchMinute} out of [0,${MAX_MATCH_MINUTE}]. Clamping to ${clampedMinute}.`,
+    );
+    c.matchInfo.matchMinute = clampedMinute;
+  }
+
+  // Rules 10 & 11: amenity status and type validation.
+  c.amenities = c.amenities.map((amenity) => {
+    let corrected = { ...amenity };
+
+    if (!VALID_AMENITY_STATUSES.has(amenity.status)) {
+      console.warn(
+        `[Validator] Amenity "${amenity.id}" has invalid status "${amenity.status}". Resetting to "open".`,
+      );
+      corrected = { ...corrected, status: 'open' as const };
+    }
+
+    if (!VALID_AMENITY_TYPES.has(amenity.type)) {
+      console.warn(
+        `[Validator] Amenity "${amenity.id}" has invalid type "${amenity.type}". This should not occur — check the seed file or mutation code.`,
+      );
+      // Leave type as-is; TypeScript type guards prevent this at compile time.
+    }
+
+    return corrected;
+  });
 
   return c;
 }

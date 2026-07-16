@@ -306,5 +306,142 @@
       "status": "monitoring",
       "description": "Elevator C1 (Gate C, Level 2) has gone out of service. Maintenance notified. Passengers being redirected to Gate B elevator and Gate C ramp."
     }
+  ],
+
+  "matchInfo": {
+    "homeScore": 2,
+    "awayScore": 1,
+    "matchMinute": 63,
+    "homeLineup": [
+      { "name": "Ramiro Vega",       "position": "Goalkeeper" },
+      { "name": "Dario Castellano", "position": "Centre-Back" },
+      { "name": "Emilio Fuentes",   "position": "Left-Back" },
+      { "name": "Nicolás Reyes",    "position": "Central Midfielder" },
+      { "name": "Jesús Altamar",    "position": "Attacking Midfielder" },
+      { "name": "Tomás Herrera",    "position": "Centre-Forward" }
+    ],
+    "awayLineup": [
+      { "name": "Bjørn Halvorsen",  "position": "Goalkeeper" },
+      { "name": "Erik Lindqvist",   "position": "Centre-Back" },
+      { "name": "Mikkel Strand",    "position": "Right-Back" },
+      { "name": "Lars Bergström",   "position": "Central Midfielder" },
+      { "name": "Sven Dalgaard",    "position": "Left Winger" },
+      { "name": "Nils Thorngren",   "position": "Centre-Forward" }
+    ],
+    "recentEvents": [
+      {
+        "minute": 18,
+        "type": "goal",
+        "description": "Atlético Dorado — Tomás Herrera with a cool finish from the edge of the box after a slick passing move"
+      },
+      {
+        "minute": 34,
+        "type": "goal",
+        "description": "FC Nordvik — Nils Thorngren heads in from a corner to level the score"
+      },
+      {
+        "minute": 41,
+        "type": "yellow-card",
+        "description": "FC Nordvik — Lars Bergström cautioned for a late challenge on Nicolás Reyes near the halfway line"
+      },
+      {
+        "minute": 57,
+        "type": "goal",
+        "description": "Atlético Dorado — Jesús Altamar curls a free kick into the top-right corner to restore the lead"
+      }
+    ]
+  },
+
+  "amenities": [
+    {
+      "id": "amen-food-a1",
+      "name": "North Concourse Grill",
+      "type": "food",
+      "status": "open",
+      "locationReference": "gate-a",
+      "displayLocation": "Gate A — North Concourse, Level 1",
+      "description": "Grilled specialties, burgers, and local street-food favourites"
+    },
+    {
+      "id": "amen-bev-a2",
+      "name": "Gate A Drinks Bar",
+      "type": "beverage",
+      "status": "busy",
+      "locationReference": "gate-a",
+      "displayLocation": "Gate A — North Concourse, Level 1",
+      "description": "Hot drinks, cold beverages, and soft drinks"
+    },
+    {
+      "id": "amen-merch-b1",
+      "name": "North-East Merchandise Kiosk",
+      "type": "merchandise",
+      "status": "open",
+      "locationReference": "gate-b",
+      "displayLocation": "Gate B — North-East Corner, Concourse Level",
+      "description": "Official match programmes, scarves, and branded accessories"
+    },
+    {
+      "id": "amen-food-c1",
+      "name": "East Stand Snack Stand",
+      "type": "food",
+      "status": "busy",
+      "locationReference": "gate-c",
+      "displayLocation": "Gate C — East Stand, Level 1",
+      "description": "Pies, hot dogs, and pre-packaged snacks"
+    },
+    {
+      "id": "amen-bev-d1",
+      "name": "South-East Drinks Kiosk",
+      "type": "beverage",
+      "status": "open",
+      "locationReference": "gate-d",
+      "displayLocation": "Gate D — South-East Corner, Concourse Level",
+      "description": "Juices, water, and sports drinks"
+    },
+    {
+      "id": "amen-food-e1",
+      "name": "South Terrace Kitchen",
+      "type": "food",
+      "status": "open",
+      "locationReference": "gate-e",
+      "displayLocation": "Gate E — South Stand, Level 1",
+      "description": "Full-menu kitchen with wraps, salads, and hot meals"
+    },
+    {
+      "id": "amen-merch-f1",
+      "name": "Gate D Merchandise Kiosk",
+      "type": "merchandise",
+      "status": "closed",
+      "locationReference": "gate-f",
+      "displayLocation": "Gate F — South-West Corner, Concourse Level",
+      "description": "Replica kits and supporter merchandise — currently closed for restocking"
+    },
+    {
+      "id": "amen-bev-g1",
+      "name": "West Stand Café",
+      "type": "beverage",
+      "status": "open",
+      "locationReference": "gate-g",
+      "displayLocation": "Gate G — West Stand, Level 2",
+      "description": "Specialty coffee, teas, and premium cold drinks"
+    },
+    {
+      "id": "amen-food-g2",
+      "name": "West Concourse Food Court",
+      "type": "food",
+      "status": "open",
+      "locationReference": "gate-g",
+      "displayLocation": "Gate G — West Stand, Level 1",
+      "description": "Multi-vendor food court with diverse cuisine options"
+    },
+    {
+      "id": "amen-merch-h1",
+      "name": "North-West Fan Shop",
+      "type": "merchandise",
+      "status": "open",
+      "locationReference": "gate-h",
+      "displayLocation": "Gate H — North-West Corner, Concourse Level",
+      "description": "Full official fan shop — largest merchandise outlet in the stadium"
+    }
   ]
 }

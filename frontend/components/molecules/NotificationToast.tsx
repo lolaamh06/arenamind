@@ -10,6 +10,18 @@ export interface NotificationToastProps {
   className?: string;
 }
 
+/*
+ * NotificationToast — Phase 5A Visual Overhaul
+ *
+ * Previous: border-border-color on bg-bg-card — looked like a regular card.
+ * Now: glass surface (same floating context pattern as Tooltip) + left-side
+ *   colored accent stripe that signals severity at a glance (F1 UI pattern:
+ *   left border accent color for status/severity identification).
+ *
+ * The icon gets a small tinted container rather than just floating text.
+ * Dismiss button uses rounded-full hover consistent with other button patterns.
+ * Shadow uses shadow-xl so it reads above all page layers.
+ */
 export const NotificationToast: React.FC<NotificationToastProps> = ({
   message,
   type = 'info',
@@ -21,30 +33,72 @@ export const NotificationToast: React.FC<NotificationToastProps> = ({
     const timer = setTimeout(() => {
       onClose();
     }, duration);
-
     return () => clearTimeout(timer);
   }, [duration, onClose]);
 
   const typeConfig = {
-    info: { icon: Info, color: 'text-primary-500 bg-primary-50 border-primary-100 dark:bg-primary-950/20' },
-    success: { icon: CheckCircle, color: 'text-secondary-500 bg-secondary-50 border-secondary-100 dark:bg-secondary-950/20' },
-    error: { icon: AlertCircle, color: 'text-critical-500 bg-critical-50 border-critical-100 dark:bg-critical-950/20' },
+    info: {
+      icon:        Info,
+      iconColor:   'text-[#818cf8]',
+      iconBg:      'bg-[rgba(99,102,241,0.12)]',
+      accentColor: '#6366f1',
+    },
+    success: {
+      icon:        CheckCircle,
+      iconColor:   'text-[#34d399]',
+      iconBg:      'bg-[rgba(16,185,129,0.12)]',
+      accentColor: '#10b981',
+    },
+    error: {
+      icon:        AlertCircle,
+      iconColor:   'text-[#f87171]',
+      iconBg:      'bg-[rgba(239,68,68,0.12)]',
+      accentColor: '#ef4444',
+    },
   };
+
+  const config = typeConfig[type];
 
   return (
     <div
       role="status"
       aria-live="polite"
-      className={`fixed bottom-4 right-4 z-50 flex items-center gap-3 p-3 rounded-medium border shadow-high bg-bg-card max-w-sm border-border-color transition-all duration-fast ${className}`}
+      className={[
+        'fixed bottom-4 right-4 z-50',
+        'flex items-center gap-3 p-3 pr-4 rounded-large max-w-sm',
+        'bg-[rgba(28,28,46,0.90)] backdrop-blur-xl',
+        'border border-[rgba(255,255,255,0.10)]',
+        'shadow-[0_16px_40px_rgba(0,0,0,0.7),0_8px_16px_rgba(0,0,0,0.4)]',
+        'transition-all duration-fast overflow-hidden',
+        className,
+      ].join(' ')}
+      style={{
+        /* Left accent stripe — severity identification at a glance */
+        borderLeft: `3px solid ${config.accentColor}`,
+      }}
     >
-      <div className="flex-shrink-0">
-        <IconWrapper icon={typeConfig[type].icon} size="md" className={typeConfig[type].color} />
+      {/* Icon */}
+      <div
+        className={`flex-shrink-0 h-8 w-8 rounded-medium flex items-center justify-center ${config.iconBg}`}
+      >
+        <IconWrapper icon={config.icon} size="sm" className={config.iconColor} />
       </div>
-      <p className="text-xs font-medium text-text-primary grow pr-4">{message}</p>
+
+      {/* Message */}
+      <p className="text-xs font-medium text-text-primary grow leading-snug">
+        {message}
+      </p>
+
+      {/* Dismiss */}
       <button
         onClick={onClose}
         aria-label="Dismiss notification"
-        className="flex-shrink-0 text-text-muted hover:text-text-primary p-0.5 rounded-full hover:bg-neutral-100 dark:hover:bg-neutral-800 focus-visible-ring"
+        className={[
+          'flex-shrink-0 ml-1 p-1 rounded-full',
+          'text-text-muted hover:text-text-primary',
+          'hover:bg-[rgba(255,255,255,0.08)]',
+          'transition-colors duration-fast focus-visible-ring',
+        ].join(' ')}
       >
         <IconWrapper icon={X} size="sm" />
       </button>

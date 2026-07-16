@@ -89,6 +89,9 @@ function buildFailureBrief(
   trigger: DecisionTrigger,
   errors: string[],
   cause?: string,
+  signals?: RelevantSignals,
+  prompt?: string,
+  rawResponse?: string,
 ): DecisionBrief {
   return {
     id: randomUUID(),
@@ -104,6 +107,9 @@ function buildFailureBrief(
     validationErrors: cause ? [...errors, cause] : errors,
     evidenceWarnings: [],
     contradictionWarning: null,
+    signals,
+    prompt,
+    rawResponse,
   };
 }
 
@@ -117,8 +123,8 @@ function buildFailureBrief(
  * and detailed error information in validationErrors.
  */
 export async function generateDecisionBrief(trigger: DecisionTrigger): Promise<DecisionBrief> {
-  let signals: RelevantSignals;
-  let basePrompt: string;
+  let signals: RelevantSignals | undefined;
+  let basePrompt: string | undefined;
 
   // ── Step 1 & 2: Context Engine → Signal Filter ─────────────────────────────
   try {
@@ -142,12 +148,14 @@ export async function generateDecisionBrief(trigger: DecisionTrigger): Promise<D
       trigger,
       ['Failed to build Gemini prompt.'],
       err instanceof Error ? err.message : String(err),
+      signals,
     );
   }
 
   // ── Steps 4 & 5: Gemini Call → Validate (with one regeneration attempt) ────
   let rawResponse: string;
   let retryNeeded = false;
+  let finalPrompt = basePrompt;
 
   // First attempt
   try {
@@ -160,10 +168,11 @@ export async function generateDecisionBrief(trigger: DecisionTrigger): Promise<D
           ? `Gemini API error: ${err.message}`
           : `Unexpected error calling Gemini: ${err instanceof Error ? err.message : String(err)}`;
     console.error('[Orchestrator] Gemini call failed (attempt 1):', errMsg);
-    return buildFailureBrief(trigger, [errMsg]);
+    return buildFailureBrief(trigger, [errMsg], undefined, signals, basePrompt);
   }
 
   let validation = validateGeminiOutput(rawResponse, signals);
+  let finalResponse = rawResponse;
 
   // If first attempt invalid → one regeneration pass
   if (!validation.isValid) {
@@ -174,17 +183,19 @@ export async function generateDecisionBrief(trigger: DecisionTrigger): Promise<D
     );
     retryNeeded = true;
     const regenPrompt = buildRegenerationPrompt(basePrompt, validation.validationErrors);
+    finalPrompt = regenPrompt;
 
     let regenResponse: string;
     try {
       regenResponse = await callGemini(regenPrompt);
+      finalResponse = regenResponse;
     } catch (err) {
       const errMsg =
         err instanceof GeminiTimeoutError
           ? `Gemini timed out on regeneration attempt: ${err.message}`
           : `Gemini API error on regeneration attempt: ${err instanceof Error ? err.message : String(err)}`;
       console.error('[Orchestrator] Gemini regeneration failed:', errMsg);
-      return buildFailureBrief(trigger, validation.validationErrors, errMsg);
+      return buildFailureBrief(trigger, validation.validationErrors, errMsg, signals, regenPrompt);
     }
 
     validation = validateGeminiOutput(regenResponse, signals);
@@ -194,10 +205,17 @@ export async function generateDecisionBrief(trigger: DecisionTrigger): Promise<D
         `[Orchestrator] Regeneration also failed validation. ` +
           `Errors: ${validation.validationErrors.join('; ')}.`,
       );
-      return buildFailureBrief(trigger, [
-        'First attempt: ' + validation.validationErrors.join('; '),
-        'Regeneration also failed — returning graceful failure brief.',
-      ]);
+      return buildFailureBrief(
+        trigger,
+        [
+          'First attempt: ' + validation.validationErrors.join('; '),
+          'Regeneration also failed — returning graceful failure brief.',
+        ],
+        undefined,
+        signals,
+        regenPrompt,
+        regenResponse,
+      );
     }
 
     console.log('[Orchestrator] Regeneration succeeded.');
@@ -223,6 +241,9 @@ export async function generateDecisionBrief(trigger: DecisionTrigger): Promise<D
     validationErrors: [],
     evidenceWarnings: validation.evidenceWarnings,
     contradictionWarning: null, // filled in below
+    signals,
+    prompt: finalPrompt,
+    rawResponse: finalResponse,
   };
 
   const contradictionWarning = checkForContradiction(preliminaryBrief);

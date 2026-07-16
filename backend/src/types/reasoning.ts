@@ -233,4 +233,9 @@ export interface DecisionBrief {
   validationErrors: string[];
   evidenceWarnings: string[];
   contradictionWarning: string | null;
+
+  // Walkthrough pipeline intermediate artifacts (Option A)
+  signals?: RelevantSignals;
+  prompt?: string;
+  rawResponse?: string;
 }

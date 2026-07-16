@@ -7,6 +7,21 @@ export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElemen
   isLoading?: boolean;
 }
 
+/*
+ * Button — Phase 5A Visual Overhaul
+ *
+ * Previous: flat bg-primary-600 fills, generic hover states.
+ * Now:
+ *   primary  — Indigo fill with box-shadow glow on hover. Slight inner highlight
+ *              (inset top border) mimics 3D button feel common in premium UIs.
+ *   secondary — Transparent with bordered treatment + subtle fill on hover.
+ *              Border uses the strong border token (more visible than default).
+ *   ghost    — Text-only, barely-there hover fill, used for tertiary actions.
+ *   danger   — Red fill with critical glow on hover.
+ *
+ * All transitions use --animate-fast (120ms) for snappy interactive feedback.
+ * active:scale gives tactile "press" sensation without JS.
+ */
 export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   (
     {
@@ -20,24 +35,44 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     },
     ref,
   ) => {
-    // Base interactive styles with accessible outline
-    const baseStyle =
-      'inline-flex items-center justify-center font-medium rounded-medium transition-colors duration-fast focus-visible-ring select-none active:scale-[0.98] cursor-pointer';
+    const baseStyle = [
+      'inline-flex items-center justify-center font-semibold font-sans rounded-medium',
+      'transition-all duration-fast focus-visible-ring select-none',
+      'active:scale-[0.97] cursor-pointer',
+      'disabled:opacity-40 disabled:cursor-not-allowed disabled:pointer-events-none',
+    ].join(' ');
 
-    // Variant classes mapping to the theme tokens
     const variantStyles = {
-      primary: 'bg-primary-600 hover:bg-primary-700 text-white disabled:bg-neutral-200 disabled:text-neutral-400 dark:disabled:bg-neutral-800 dark:disabled:text-neutral-500',
-      secondary:
-        'border border-border-color hover:bg-bg-secondary text-text-primary disabled:border-neutral-200 disabled:text-neutral-400 dark:disabled:border-neutral-800 dark:disabled:text-neutral-500',
-      ghost: 'hover:bg-bg-secondary text-text-secondary hover:text-text-primary disabled:text-neutral-400 dark:disabled:text-neutral-500',
-      danger: 'bg-critical-600 hover:bg-critical-700 text-white disabled:bg-neutral-200 disabled:text-neutral-400 dark:disabled:bg-neutral-800 dark:disabled:text-neutral-500',
+      primary: [
+        'bg-primary-600 text-white',
+        'hover:bg-primary-500',
+        'hover:shadow-[0_0_0_1px_rgba(129,140,248,0.25),0_4px_16px_rgba(99,102,241,0.30)]',
+        'shadow-[0_1px_0_rgba(255,255,255,0.10)_inset]',
+      ].join(' '),
+
+      secondary: [
+        'bg-transparent text-text-primary',
+        'border border-[rgba(255,255,255,0.13)]',
+        'hover:bg-bg-raised hover:border-[rgba(255,255,255,0.20)]',
+      ].join(' '),
+
+      ghost: [
+        'bg-transparent text-text-secondary',
+        'hover:bg-[rgba(255,255,255,0.06)] hover:text-text-primary',
+      ].join(' '),
+
+      danger: [
+        'bg-critical-700 text-white',
+        'hover:bg-critical-600',
+        'hover:shadow-[0_0_0_1px_rgba(239,68,68,0.30),0_4px_16px_rgba(239,68,68,0.25)]',
+        'shadow-[0_1px_0_rgba(255,255,255,0.08)_inset]',
+      ].join(' '),
     };
 
-    // Size classes (multiple of 8px)
     const sizeStyles = {
-      sm: 'px-3 py-1.5 text-xs',
-      md: 'px-4 py-2 text-sm',
-      lg: 'px-6 py-3 text-base',
+      sm: 'px-3 py-1.5 text-xs tracking-wide gap-1.5',
+      md: 'px-4 py-2 text-sm gap-2',
+      lg: 'px-6 py-2.5 text-base gap-2',
     };
 
     return (
@@ -50,7 +85,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         {isLoading ? (
           <>
             <svg
-              className="animate-spin -ml-1 mr-2 h-4 w-4 text-current"
+              className="animate-spin -ml-0.5 h-4 w-4 text-current"
               xmlns="http://www.w3.org/2000/svg"
               fill="none"
               viewBox="0 0 24 24"
@@ -69,7 +104,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
                 d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
               />
             </svg>
-            <span>Loading...</span>
+            <span>Loading…</span>
           </>
         ) : (
           children

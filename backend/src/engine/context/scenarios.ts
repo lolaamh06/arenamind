@@ -19,7 +19,7 @@
  */
 
 import type { StadiumContext, Gate, Incident, Volunteer } from '../../types';
-import { validate } from './validator';
+import { validate, MAX_MATCH_MINUTE } from './validator';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -154,6 +154,10 @@ export function applyHeavyRain(ctx: StadiumContext): StadiumContext {
     return v;
   });
 
+  // Phase 4C-1: Nudge matchMinute forward by 4 minutes to simulate match
+  // progression during a demo session. Clamped to MAX_MATCH_MINUTE (99).
+  c.matchInfo.matchMinute = Math.min(MAX_MATCH_MINUTE, c.matchInfo.matchMinute + 4);
+
   return validate(c);
 }
 
@@ -239,6 +243,10 @@ export function applyCrowdSurge(ctx: StadiumContext): StadiumContext {
   });
   c.transport.generalAdvisory =
     'CROWD SURGE ALERT at Gate D. East Rideshare drop-off suspended. All fans arriving by rideshare or taxi are redirected to North Metro Station. Fans in sections 118–121 should use Gates E or F for egress.';
+
+  // Phase 4C-1: Nudge matchMinute forward by 3 minutes to simulate match
+  // progression during a demo session. Clamped to MAX_MATCH_MINUTE (99).
+  c.matchInfo.matchMinute = Math.min(MAX_MATCH_MINUTE, c.matchInfo.matchMinute + 3);
 
   return validate(c);
 }
@@ -338,6 +346,10 @@ export function applyMedicalIncident(ctx: StadiumContext): StadiumContext {
 
   c.transport.generalAdvisory =
     'MEDICAL INCIDENT at Gate C. Gate C is temporarily restricted. Fans with tickets for sections 112–117 should use Gate B. Emergency services have priority access to Gate C corridor.';
+
+  // Phase 4C-1: Nudge matchMinute forward by 5 minutes to simulate match
+  // progression during a demo session. Clamped to MAX_MATCH_MINUTE (99).
+  c.matchInfo.matchMinute = Math.min(MAX_MATCH_MINUTE, c.matchInfo.matchMinute + 5);
 
   return validate(c);
 }
