@@ -1,7 +1,7 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 'use client';
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, memo } from 'react';
 import * as THREE from 'three';
 import { StadiumContext, RiskLevel, Gate } from '../../types';
 import { Badge } from '../atoms/Badge';
@@ -175,8 +175,11 @@ const Stadium3DModel: React.FC<Stadium3DModelProps> = ({
   const isSimple = variant === 'simple';
   const riskColors = isSimple ? simpleRiskColors : detailedRiskColors;
 
-  // Memoize canvas generation for pitch texture
-  const pitchCanvas = useMemo(() => createPitchCanvas(isSimple), [isSimple]);
+  // Memoize canvas generation for pitch texture — also dispose the canvas on unmount
+  const pitchCanvas = useMemo(() => {
+    const c = createPitchCanvas(isSimple);
+    return c;
+  }, [isSimple]);
 
   // Seating Stand definitions flanking all sides of the pitch
   const stands: Array<{ pos: [number, number, number]; size: [number, number]; dir: 'h' | 'v'; color: string; seatColor: string }> = useMemo(() => [
@@ -412,6 +415,8 @@ const Stadium3DModel: React.FC<Stadium3DModelProps> = ({
   );
 };
 
+const Stadium3DModelMemo = memo(Stadium3DModel);
+
 // ─── Procedural Rain Particle System ───
 const RainParticles: React.FC = () => {
   const count = 180;
@@ -434,7 +439,6 @@ const RainParticles: React.FC = () => {
     return [pos, spds];
   }, []);
 
-  // Frame tick animation for rain drops
   useEffect(() => {
     let animationFrameId: number;
     const tick = () => {
@@ -455,7 +459,18 @@ const RainParticles: React.FC = () => {
       animationFrameId = requestAnimationFrame(tick);
     };
     tick();
-    return () => cancelAnimationFrame(animationFrameId);
+    return () => {
+      cancelAnimationFrame(animationFrameId);
+      // Dispose geometry and material to free GPU memory on unmount
+      if (meshRef.current) {
+        meshRef.current.geometry?.dispose();
+        if (meshRef.current.material) {
+          const mat = meshRef.current.material;
+          if (Array.isArray(mat)) mat.forEach(m => m.dispose());
+          else mat.dispose();
+        }
+      }
+    };
   }, [speeds]);
 
   return (
@@ -477,7 +492,7 @@ const RainParticles: React.FC = () => {
 };
 
 // ─── MAIN PORTAL CONTAINER COMPONENT ─────────────────────────────────────────
-export const StadiumTwinDiagram: React.FC<StadiumTwinDiagramProps> = ({
+const StadiumTwinDiagramBase: React.FC<StadiumTwinDiagramProps> = ({
   stadiumContext,
   onGateClick,
   selectedGateId,
@@ -485,6 +500,14 @@ export const StadiumTwinDiagram: React.FC<StadiumTwinDiagramProps> = ({
 }) => {
   const [hoveredGateId, setHoveredGateId] = useState<string | null>(null);
   const [webglSupported, setWebglSupported] = useState<boolean | null>(null);
+
+  // Stable camera config — object must not be recreated on every render
+  // otherwise R3F reconfigures the PerspectiveCamera each time, contributing
+  // to unnecessary scene updates and WebGL context pressure.
+  const stableCamera = useMemo(
+    () => ({ position: [0, 6.5, 9.5] as [number, number, number], fov: 45 }),
+    []
+  );
 
   useEffect(() => {
     setWebglSupported(isWebGLAvailable());
@@ -542,12 +565,13 @@ export const StadiumTwinDiagram: React.FC<StadiumTwinDiagramProps> = ({
         {webglSupported ? (
           // ─── ThreeJS / React Three Fiber 3D Canvas ───
           <Canvas
-            shadows
-            camera={{ position: [0, 6.5, 9.5], fov: 45 }}
+            shadows={!isSimple}
+            camera={stableCamera}
+            frameloop={isSimple ? 'demand' : 'always'}
             style={{ pointerEvents: 'auto' }}
           >
             <color attach="background" args={['#070710']} />
-            <Stadium3DModel
+            <Stadium3DModelMemo
               gates={gates}
               weather={weather}
               onGateClick={onGateClick}
@@ -725,3 +749,41 @@ export const StadiumTwinDiagram: React.FC<StadiumTwinDiagramProps> = ({
     </div>
   );
 };
+
+// ─── Stable export with shallow prop equality ────────────────────────────────
+// React.memo prevents the expensive Canvas + 3D scene from re-mounting every
+// time the parent polling cycle fires a new stadiumContext object reference.
+// The comparator checks gate-level data shallowly so real changes (risk level,
+// occupancy) still propagate, but cosmetically-identical re-renders are skipped.
+function areStadiumPropsEqual(
+  prev: StadiumTwinDiagramProps,
+  next: StadiumTwinDiagramProps,
+): boolean {
+  if (prev.variant !== next.variant) return false;
+  if (prev.selectedGateId !== next.selectedGateId) return false;
+  if (prev.onGateClick !== next.onGateClick) return false;
+  if (!prev.stadiumContext && !next.stadiumContext) return true;
+  if (!prev.stadiumContext || !next.stadiumContext) return false;
+
+  // Compare weather
+  const pw = prev.stadiumContext.weather;
+  const nw = next.stadiumContext.weather;
+  if (pw?.condition !== nw?.condition || pw?.temperatureCelsius !== nw?.temperatureCelsius) return false;
+
+  // Compare gates shallowly (riskLevel + occupancyPercent + queueEstimate + trend)
+  const pg = prev.stadiumContext.gates ?? [];
+  const ng = next.stadiumContext.gates ?? [];
+  if (pg.length !== ng.length) return false;
+  for (let i = 0; i < pg.length; i++) {
+    if (
+      pg[i].id !== ng[i].id ||
+      pg[i].riskLevel !== ng[i].riskLevel ||
+      pg[i].occupancyPercent !== ng[i].occupancyPercent ||
+      pg[i].queueEstimate !== ng[i].queueEstimate ||
+      pg[i].trend !== ng[i].trend
+    ) return false;
+  }
+  return true;
+}
+
+export const StadiumTwinDiagram = memo(StadiumTwinDiagramBase, areStadiumPropsEqual);

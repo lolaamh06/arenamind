@@ -52,7 +52,7 @@ import type { GeminiRawResponse } from '../../types/reasoning';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const MODEL_NAME = 'gemini-flash-latest';
+const MODEL_NAME = 'gemini-2.5-flash';
 const TIMEOUT_MS = 30_000;
 const RETRY_DELAY_MS = 1_500;
 const MAX_ATTEMPTS = 2;
