@@ -42,7 +42,7 @@ export const StadiumOverviewHeader: React.FC<StadiumOverviewHeaderProps> = ({
       <div className="flex flex-wrap gap-5 items-center justify-start md:justify-end w-full md:w-auto">
         {/* Attendance widget */}
         <div className="flex items-center gap-3">
-          <div className="h-9 w-9 rounded-full bg-primary-50 dark:bg-primary-950/40 flex items-center justify-center text-primary-600 dark:text-primary-400">
+          <div className="h-9 w-9 rounded-full bg-primary-500/10 flex items-center justify-center text-primary-600 dark:text-primary-400">
             <Users className="w-4.5 h-4.5" />
           </div>
           <div className="flex flex-col">
@@ -61,7 +61,7 @@ export const StadiumOverviewHeader: React.FC<StadiumOverviewHeaderProps> = ({
         {/* Weather widget */}
         {weather && (
           <div className="flex items-center gap-3 border-l border-border-color/50 pl-5">
-            <div className="h-9 w-9 rounded-full bg-secondary-50 dark:bg-secondary-950/40 flex items-center justify-center text-secondary-600 dark:text-secondary-400">
+            <div className="h-9 w-9 rounded-full bg-secondary-500/10 flex items-center justify-center text-secondary-600 dark:text-secondary-400">
               <Cloud className="w-4.5 h-4.5" />
             </div>
             <div className="flex flex-col">

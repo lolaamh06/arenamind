@@ -30,9 +30,15 @@ export default function OperationsStadiumTwin() {
   if (isLoadingContext && !stadiumContext) {
     return (
       <DashboardLayout sidebar={<OperationsSidebar />}>
-        <div className="flex items-center justify-center h-96">
-          <div className="animate-spin text-primary-500">
-            <IconWrapper icon={RefreshCw} size="lg" />
+        <div className="flex flex-col items-center justify-center h-96 gap-4 select-none">
+          <div className="p-6 bg-zinc-900 border border-zinc-800 rounded-2xl flex flex-col items-center gap-3 w-full max-w-sm text-center shadow-lg">
+            <div className="h-10 w-10 rounded-full bg-primary-500/10 flex items-center justify-center text-primary-400">
+              <RefreshCw className="w-5 h-5 animate-spin" />
+            </div>
+            <h3 className="text-sm font-bold text-zinc-200">Synchronizing Digital Twin</h3>
+            <p className="text-xs text-zinc-500 max-w-[240px]">
+              Connecting to live IoT sensors and telemetry databases...
+            </p>
           </div>
         </div>
       </DashboardLayout>

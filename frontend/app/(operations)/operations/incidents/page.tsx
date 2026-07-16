@@ -70,10 +70,17 @@ export default function OperationsIncidents() {
         </div>
       </div>
 
-      {/* Main List */}
       {isLoadingContext && !stadiumContext ? (
-        <div className="flex items-center justify-center h-64">
-          <IconWrapper icon={RefreshCw} size="lg" className="animate-spin text-primary-500" />
+        <div className="flex flex-col items-center justify-center h-64 gap-4 select-none">
+          <div className="p-6 bg-zinc-900 border border-zinc-800 rounded-2xl flex flex-col items-center gap-3 w-full max-w-sm text-center shadow-lg">
+            <div className="h-10 w-10 rounded-full bg-primary-500/10 flex items-center justify-center text-primary-400">
+              <RefreshCw className="w-5 h-5 animate-spin" />
+            </div>
+            <h3 className="text-sm font-bold text-zinc-200">Loading Incident Data</h3>
+            <p className="text-xs text-zinc-500 max-w-[240px]">
+              Querying active stadium dispatch logs...
+            </p>
+          </div>
         </div>
       ) : filteredIncidents.length === 0 ? (
         <div className="flex flex-col items-center justify-center text-center p-12 rounded-3xl border border-zinc-800 bg-zinc-900/20 py-20">

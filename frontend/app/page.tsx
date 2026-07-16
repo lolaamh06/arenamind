@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useStadiumState } from '../context/StadiumStateContext';
 import { ArrowRight, LayoutDashboard, Smartphone, Scale, Cloud } from 'lucide-react';
 import { IconWrapper } from '../components/atoms/IconWrapper';
+import { StadiumTwinDiagram } from '../components/organisms/StadiumTwinDiagram';
 
 export default function Home() {
   const { stadiumContext, isLoadingContext } = useStadiumState();
@@ -18,7 +19,7 @@ export default function Home() {
       <div className="absolute top-0 left-0 right-0 h-[500px] bg-gradient-to-b from-primary-950/20 via-transparent to-transparent pointer-events-none" />
 
       {/* Main Container */}
-      <div className="relative flex-1 flex flex-col items-center justify-between max-w-6xl w-full mx-auto px-6 py-12 md:py-20 gap-12 z-10">
+      <div className="relative flex-1 flex flex-col items-center justify-between max-w-6xl w-full mx-auto px-6 py-12 md:py-16 gap-8 z-10">
         
         {/* Top Header/Logo */}
         <header className="w-full flex flex-col sm:flex-row items-center justify-between gap-4">
@@ -36,51 +37,61 @@ export default function Home() {
         </header>
 
         {/* Hero Section */}
-        <section className="text-center max-w-2xl space-y-6 my-auto">
-          <h1 className="text-4xl md:text-5xl lg:text-6xl font-black tracking-tight leading-none bg-clip-text text-transparent bg-gradient-to-b from-white to-zinc-400">
-            One Truth.<br />
-            <span className="bg-clip-text text-transparent bg-gradient-to-r from-primary-400 to-secondary-400">
-              Many Perspectives.
-            </span>
-          </h1>
-          <p className="text-text-secondary text-base md:text-lg leading-relaxed max-w-xl mx-auto">
-            The real-time Digital Stadium Twin and AI Decision Intelligence engine that keeps matches safe, smooth, and predictable.
-          </p>
+        <section className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center w-full my-auto text-left">
+          <div className="lg:col-span-6 space-y-6 text-center lg:text-left">
+            <h1 className="text-4xl md:text-5xl lg:text-6xl font-black tracking-tight leading-none bg-clip-text text-transparent bg-gradient-to-b from-white to-zinc-400">
+              One Truth.<br />
+              <span className="bg-clip-text text-transparent bg-gradient-to-r from-primary-400 to-secondary-400">
+                Many Perspectives.
+              </span>
+            </h1>
+            <p className="text-text-secondary text-base md:text-lg leading-relaxed max-w-xl mx-auto lg:mx-0">
+              The real-time Digital Stadium Twin and AI Decision Intelligence engine that keeps matches safe, smooth, and predictable.
+            </p>
 
-          {/* Live Twin Snapshot Strip */}
-          <div className="pt-4">
-            <div className="inline-flex flex-wrap items-center justify-center gap-4 sm:gap-6 px-6 py-3 rounded-2xl bg-bg-card/40 border border-border-color backdrop-blur-md text-xs font-medium text-text-secondary">
-              {isLoadingContext || !metadata ? (
-                <span className="animate-pulse flex items-center gap-2">
-                  <span className="h-2 w-2 rounded-full bg-primary-500 animate-ping" />
-                  Synchronizing Twin State...
-                </span>
-              ) : (
-                <>
-                  <div className="flex items-center gap-2">
-                    <span className="h-2 w-2 rounded-full bg-emerald-500" />
-                    <span className="font-semibold text-text-primary">{metadata.name}</span>
-                  </div>
-                  <div className="h-4 w-px bg-border-color hidden sm:block" />
-                  <div className="w-full sm:w-auto">
-                    Match Phase: <span className="font-semibold text-text-primary capitalize">{metadata.matchPhase.replace('-', ' ')}</span>
-                  </div>
-                  <div className="h-4 w-px bg-border-color hidden sm:block" />
-                  <div className="w-full sm:w-auto">
-                    Attendance: <span className="font-semibold text-text-primary">{metadata.currentAttendance.toLocaleString()} / {metadata.totalCapacity.toLocaleString()}</span>
-                  </div>
-                  {weather && (
-                    <>
-                      <div className="h-4 w-px bg-border-color hidden sm:block" />
-                      <div className="flex items-center justify-center gap-1.5 capitalize w-full sm:w-auto">
-                        <IconWrapper icon={Cloud} size="sm" className="text-text-muted" />
-                        <span>{weather.condition.replace('-', ' ')} ({weather.temperatureCelsius}°C)</span>
-                      </div>
-                    </>
-                  )}
-                </>
-              )}
+            {/* Live Twin Snapshot Strip */}
+            <div className="pt-2">
+              <div className="inline-flex flex-wrap items-center justify-center lg:justify-start gap-4 sm:gap-6 px-6 py-3 rounded-2xl bg-bg-card/40 border border-border-color backdrop-blur-md text-xs font-medium text-text-secondary">
+                {isLoadingContext || !metadata ? (
+                  <span className="animate-pulse flex items-center gap-2">
+                    <span className="h-2 w-2 rounded-full bg-primary-500 animate-ping" />
+                    Synchronizing Twin State...
+                  </span>
+                ) : (
+                  <>
+                    <div className="flex items-center gap-2">
+                      <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                      <span className="font-semibold text-text-primary">{metadata.name}</span>
+                    </div>
+                    <div className="h-4 w-px bg-border-color hidden sm:block" />
+                    <div className="w-full sm:w-auto">
+                      Match Phase: <span className="font-semibold text-text-primary capitalize">{metadata.matchPhase.replace('-', ' ')}</span>
+                    </div>
+                    <div className="h-4 w-px bg-border-color hidden sm:block" />
+                    <div className="w-full sm:w-auto">
+                      Attendance: <span className="font-semibold text-text-primary">{metadata.currentAttendance.toLocaleString()}</span>
+                    </div>
+                    {weather && (
+                      <>
+                        <div className="h-4 w-px bg-border-color hidden sm:block" />
+                        <div className="flex items-center justify-center gap-1.5 capitalize w-full sm:w-auto">
+                          <IconWrapper icon={Cloud} size="sm" className="text-text-muted" />
+                          <span>{weather.condition.replace('-', ' ')}</span>
+                        </div>
+                      </>
+                    )}
+                  </>
+                )}
+              </div>
             </div>
+          </div>
+
+          {/* Stadium Twin 3D View on Right side */}
+          <div className="lg:col-span-6 w-full max-w-md mx-auto lg:max-w-none">
+            <StadiumTwinDiagram
+              stadiumContext={stadiumContext}
+              variant="simple"
+            />
           </div>
         </section>
 

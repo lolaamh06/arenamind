@@ -1,50 +1,84 @@
+/* eslint-disable react-hooks/set-state-in-effect */
 'use client';
 
-/**
- * StadiumTwinDiagram — Phase 5B Visual Illustration Rebuild
- *
- * RESEARCH SUMMARY:
- * References studied before rebuilding:
- *
- * 1. Broadcast pre-match stadium graphics (Sky Sports, ESPN, UEFA Final overlays)
- *    → Turf: alternating mown-stripe bands (light/dark opacity rows), NOT flat green.
- *    → Markings: rgba(255,255,255,0.55–0.70) — not pure white. Gives realism.
- *    → Pitch edges: soft inner vignette/shadow so pitch recedes under stands.
- *    → Scene: a "floodlit pitch" ambient — soft radial glow centered on the pitch,
- *      simulating arena lighting effects.
- *
- * 2. Ticketing platform seating maps (Ticketmaster, StubHub, SeatGeek SVG maps)
- *    → Seating bowl: 3–4 graduated concentric bands stepping from dark outer structural
- *      ring to lighter inner tier colors, giving the impression of depth/tiers.
- *    → Fine "seat row" lines: thin arcs within each band, repeating every ~8px,
- *      suggesting thousands of individual rows without drawing them individually.
- *    → Gate markers: small "stem" connecting marker to bowl edge — reads as a physical
- *      entrance/opening, not a floating UI dot. Markers have a drop-shadow/base.
- *
- * 3. Premium dashboard "facility twin" visualizations (Autodesk Tandem, IBM Maximo)
- *    → Structural corner elements for floodlight towers.
- *    → Canopy ring/shadow suggests roof structure without full 3D rendering.
- *    → Overall scene sits on a deep dark base with subtle grid/vignette.
- *
- * DIRECTION CHOSEN: Top-down (not isometric — preserves gate coordinate system).
- *   - Pitch: mown-stripe gradient fills + full correct markings
- *   - Bowl: 3-band graduated fills + fine radial row-line texture
- *   - Structural: 4 floodlight towers + canopy shadow ring
- *   - Gate markers: stem tab + SVG filter glow for critical/high states
- *   - Weather: CSS-animateTransform rain-lines (SVG-native, off React cycle)
- *   - Scene: ambient radial glow behind pitch + corner vignette
- *
- * PROPS INTERFACE: Unchanged from 4C-3/4C-4 — all calling code works as-is.
- * ACCESSIBILITY: All ARIA labels, keyboard nav, tabIndex unchanged.
- * INTERACTIVITY: All click handlers, hover state, selectedGateId unchanged.
- */
-
-import React, { useState } from 'react';
-import { StadiumContext, RiskLevel } from '../../types';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import * as THREE from 'three';
+import { StadiumContext, RiskLevel, Gate } from '../../types';
 import { Badge } from '../atoms/Badge';
 import { IconWrapper } from '../atoms/IconWrapper';
-import { Cloud, Sun, CloudRain, CloudLightning } from 'lucide-react';
+import { Cloud, Sun, CloudRain, CloudLightning, RefreshCw } from 'lucide-react';
 import { translateGateRisk } from '../../lib/fan-language';
+import dynamic from 'next/dynamic';
+
+// Dynamic imports of React Three Fiber components to prevent SSR / WebGL loading issues
+const Canvas = dynamic(
+  () => import('@react-three/fiber').then((mod) => mod.Canvas),
+  { ssr: false }
+);
+
+const OrbitControls = dynamic(
+  () => import('@react-three/drei').then((mod) => mod.OrbitControls),
+  { ssr: false }
+);
+
+const Html = dynamic(
+  () => import('@react-three/drei').then((mod) => mod.Html),
+  { ssr: false }
+);
+
+// ─── WebGL Availability Check ───────────────────────────────────────────────
+function isWebGLAvailable() {
+  try {
+    if (typeof window === 'undefined') return false;
+    const canvas = document.createElement('canvas');
+    return !!(
+      window.WebGLRenderingContext &&
+      (canvas.getContext('webgl') || canvas.getContext('experimental-webgl'))
+    );
+  } catch {
+    return false;
+  }
+}
+
+// ─── Gate Metadata & Layout mapping in 3D ──────────────────────────────────
+// Placed at outer perimeter pathway gaps
+const gate3DPositions: Record<string, { x: number; y: number; z: number; label: string; name: string }> = {
+  'gate-a': { x: 0,      y: 0.1, z: -5.6,  label: 'A', name: 'North Stand' },
+  'gate-b': { x: 4.0,    y: 0.1, z: -4.0,  label: 'B', name: 'North-East' },
+  'gate-c': { x: 5.6,    y: 0.1, z: 0,     label: 'C', name: 'East Stand' },
+  'gate-d': { x: 4.0,    y: 0.1, z: 4.0,   label: 'D', name: 'South-East' },
+  'gate-e': { x: 0,      y: 0.1, z: 5.6,   label: 'E', name: 'South Stand' },
+  'gate-f': { x: -4.0,   y: 0.1, z: 4.0,   label: 'F', name: 'South-West' },
+  'gate-g': { x: -5.6,   y: 0.1, z: 0,     label: 'G', name: 'West Stand' },
+  'gate-h': { x: -4.0,   y: 0.1, z: -4.0,  label: 'H', name: 'North-West' },
+};
+
+// ─── Gate Coordinates for 2D Fallback ────────────────────────────────────────
+const gate2DCoordinates: Record<string, { x: number; y: number; label: string; name: string }> = {
+  'gate-a': { x: 250, y: 48,  label: 'A', name: 'North Stand' },
+  'gate-b': { x: 392, y: 88,  label: 'B', name: 'North-East' },
+  'gate-c': { x: 448, y: 200, label: 'C', name: 'East Stand' },
+  'gate-d': { x: 392, y: 312, label: 'D', name: 'South-East' },
+  'gate-e': { x: 250, y: 352, label: 'E', name: 'South Stand' },
+  'gate-f': { x: 108, y: 312, label: 'F', name: 'South-West' },
+  'gate-g': { x: 52,  y: 200, label: 'G', name: 'West Stand' },
+  'gate-h': { x: 108, y: 88,  label: 'H', name: 'North-West' },
+};
+
+// ─── Risk Color Maps ────────────────────────────────────────────────────────
+const detailedRiskColors: Record<RiskLevel, { stroke: string; fill: string; glow: string; text: string; glowIntensity: number }> = {
+  low:      { stroke: '#52526a', fill: '#16162a', glow: '#52526a', text: '#9090a8', glowIntensity: 0.0 },
+  moderate: { stroke: '#818cf8', fill: '#312e81', glow: '#818cf8', text: '#c7d2fe', glowIntensity: 1.0 },
+  high:     { stroke: '#fbbf24', fill: '#78350f', glow: '#fbbf24', text: '#fde68a', glowIntensity: 2.2 },
+  critical: { stroke: '#f87171', fill: '#450a0a', glow: '#f87171', text: '#fecaca', glowIntensity: 3.5 },
+};
+
+const simpleRiskColors: Record<RiskLevel, { stroke: string; fill: string; glow: string; text: string; glowIntensity: number }> = {
+  low:      { stroke: '#34d399', fill: '#022c22', glow: '#34d399', text: '#6ee7b7', glowIntensity: 0.0 },
+  moderate: { stroke: '#60a5fa', fill: '#1e3a8a', glow: '#60a5fa', text: '#bfdbfe', glowIntensity: 1.0 },
+  high:     { stroke: '#fbbf24', fill: '#78350f', glow: '#fbbf24', text: '#fde68a', glowIntensity: 2.0 },
+  critical: { stroke: '#fbbf24', fill: '#78350f', glow: '#fbbf24', text: '#fde68a', glowIntensity: 2.5 },
+};
 
 export interface StadiumTwinDiagramProps {
   stadiumContext: StadiumContext | null;
@@ -53,6 +87,396 @@ export interface StadiumTwinDiagramProps {
   variant?: 'detailed' | 'simple';
 }
 
+// ─── 3D PITCH CANVAS TEXTURE GENERATOR ───────────────────────────────────────
+function createPitchCanvas(isSimple: boolean) {
+  if (typeof document === 'undefined') return null;
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 340;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return canvas;
+
+  const bgBase  = isSimple ? '#0e3822' : '#0d3320';
+  const bgLight = isSimple ? '#115430' : '#0f4428';
+  const bgDark  = isSimple ? '#0b2e1c' : '#0b2e1c';
+  const markColor = 'rgba(255,255,255,0.75)';
+
+  ctx.fillStyle = bgBase;
+  ctx.fillRect(0, 0, 512, 340);
+
+  // Alternating stripes (16 light/dark rows)
+  const numStripes = 16;
+  const stripeWidth = 512 / numStripes;
+  for (let i = 0; i < numStripes; i++) {
+    ctx.fillStyle = i % 2 === 0 ? bgLight : bgDark;
+    ctx.fillRect(i * stripeWidth, 0, stripeWidth, 340);
+  }
+
+  // Draw boundary markings
+  ctx.strokeStyle = markColor;
+  ctx.lineWidth = 3;
+  ctx.strokeRect(10, 10, 492, 320);
+
+  // Center Line
+  ctx.beginPath();
+  ctx.moveTo(256, 10);
+  ctx.lineTo(256, 330);
+  ctx.stroke();
+
+  // Center Circle
+  ctx.beginPath();
+  ctx.arc(256, 170, 50, 0, 2 * Math.PI);
+  ctx.stroke();
+
+  // Center Dot
+  ctx.fillStyle = markColor;
+  ctx.beginPath();
+  ctx.arc(256, 170, 4, 0, 2 * Math.PI);
+  ctx.fill();
+
+  // Penalty Areas (Left & Right)
+  ctx.strokeRect(10, 75, 75, 190);
+  ctx.strokeRect(427, 75, 75, 190);
+
+  // Goal Areas
+  ctx.strokeRect(10, 120, 25, 100);
+  ctx.strokeRect(477, 120, 25, 100);
+
+  // Corner arcs
+  const rArc = 10;
+  ctx.beginPath(); ctx.arc(10, 10, rArc, 0, 0.5 * Math.PI); ctx.stroke();
+  ctx.beginPath(); ctx.arc(10, 330, rArc, 1.5 * Math.PI, 2 * Math.PI); ctx.stroke();
+  ctx.beginPath(); ctx.arc(502, 10, rArc, 0.5 * Math.PI, Math.PI); ctx.stroke();
+  ctx.beginPath(); ctx.arc(502, 330, rArc, Math.PI, 1.5 * Math.PI); ctx.stroke();
+
+  return canvas;
+}
+
+// ─── 3D STADIUM MODEL INTERNAL COMPONENT ─────────────────────────────────────
+interface Stadium3DModelProps {
+  gates: Gate[];
+  weather: { condition: string; temperatureCelsius: number } | null | undefined;
+  onGateClick?: (gateId: string) => void;
+  selectedGateId?: string | null;
+  variant: 'detailed' | 'simple';
+  hoveredGateId: string | null;
+  setHoveredGateId: (id: string | null) => void;
+}
+
+const Stadium3DModel: React.FC<Stadium3DModelProps> = ({
+  gates,
+  weather,
+  onGateClick,
+  selectedGateId,
+  variant,
+  hoveredGateId,
+  setHoveredGateId
+}) => {
+  const isSimple = variant === 'simple';
+  const riskColors = isSimple ? simpleRiskColors : detailedRiskColors;
+
+  // Memoize canvas generation for pitch texture
+  const pitchCanvas = useMemo(() => createPitchCanvas(isSimple), [isSimple]);
+
+  // Seating Stand definitions flanking all sides of the pitch
+  const stands: Array<{ pos: [number, number, number]; size: [number, number]; dir: 'h' | 'v'; color: string; seatColor: string }> = useMemo(() => [
+    // North Stand (Blue seats)
+    { pos: [0, 0, -4.2], size: [7.2, 1.0], dir: 'h', color: '#1e3a8a', seatColor: '#3b82f6' },
+    // South Stand (Emerald seats)
+    { pos: [0, 0, 4.2], size: [7.2, 1.0], dir: 'h', color: '#064e3b', seatColor: '#10b981' },
+    // East Stand (Amber seats)
+    { pos: [4.9, 0, 0], size: [1.0, 5.0], dir: 'v', color: '#78350f', seatColor: '#f59e0b' },
+    // West Stand (Red seats)
+    { pos: [-4.9, 0, 0], size: [1.0, 5.0], dir: 'v', color: '#7f1d1d', seatColor: '#ef4444' },
+  ], []);
+
+  // Weather effects mapping (Three.js Fog)
+  const isRaining = weather?.condition === 'light-rain' || weather?.condition === 'heavy-rain' || weather?.condition === 'storm';
+  const isCloudy = weather?.condition === 'cloudy';
+
+  return (
+    <>
+      {/* ── Atmospheric fog based on weather context ── */}
+      {isRaining && <fog attach="fog" args={['#070710', 8, 20]} />}
+      {isCloudy && <fog attach="fog" args={['#0a0a16', 12, 25]} />}
+
+      {/* ── Main evening lighting ── */}
+      <ambientLight intensity={0.7} />
+      <directionalLight position={[8, 15, 6]} intensity={1.2} color="#e0f2fe" castShadow />
+      
+      {/* ── Flooding spots at corners pointing to field ── */}
+      <pointLight position={[6, 5, 4]} intensity={1.5} color="#fbbf24" distance={18} />
+      <pointLight position={[-6, 5, -4]} intensity={1.5} color="#fbbf24" distance={18} />
+      <pointLight position={[6, 5, -4]} intensity={1.5} color="#fbbf24" distance={18} />
+      <pointLight position={[-6, 5, 4]} intensity={1.5} color="#fbbf24" distance={18} />
+
+      {/* ── Central Pitch plane ── */}
+      {pitchCanvas && (
+        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.01, 0]} receiveShadow>
+          <planeGeometry args={[8.5, 5.6]} />
+          <meshBasicMaterial>
+            <canvasTexture attach="map" image={pitchCanvas} />
+          </meshBasicMaterial>
+        </mesh>
+      )}
+
+      {/* ── Green pitch borders ── */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow>
+        <planeGeometry args={[9.8, 6.8]} />
+        <meshStandardMaterial color={isSimple ? '#092c1a' : '#061f12'} roughness={0.9} />
+      </mesh>
+
+      {/* ── 3D Realistic Seating Stands flanking the field ── */}
+      {stands.map((stand, idx) => {
+        const isHorizontal = stand.dir === 'h';
+        return (
+          <group key={idx} position={stand.pos}>
+            {/* Step 1 (Lower Step concrete + seats) */}
+            <mesh position={[0, 0.15, 0]} castShadow receiveShadow>
+              <boxGeometry args={isHorizontal ? [stand.size[0], 0.3, 0.35] : [0.35, 0.3, stand.size[1]]} />
+              <meshStandardMaterial color={stand.color} roughness={0.8} />
+            </mesh>
+            <mesh position={isHorizontal ? [0, 0.31, 0.05] : [0.05, 0.31, 0]} castShadow>
+              <boxGeometry args={isHorizontal ? [stand.size[0] - 0.1, 0.06, 0.2] : [0.2, 0.06, stand.size[1] - 0.1]} />
+              <meshStandardMaterial color={stand.seatColor} roughness={0.5} />
+            </mesh>
+
+            {/* Step 2 (Middle Step concrete + seats) */}
+            <mesh position={isHorizontal ? [0, 0.45, -0.3] : [-0.3, 0.45, 0]} castShadow receiveShadow>
+              <boxGeometry args={isHorizontal ? [stand.size[0], 0.3, 0.35] : [0.35, 0.3, stand.size[1]]} />
+              <meshStandardMaterial color={stand.color} roughness={0.8} />
+            </mesh>
+            <mesh position={isHorizontal ? [0, 0.61, -0.25] : [-0.25, 0.61, 0]} castShadow>
+              <boxGeometry args={isHorizontal ? [stand.size[0] - 0.1, 0.06, 0.2] : [0.2, 0.06, stand.size[1] - 0.1]} />
+              <meshStandardMaterial color={stand.seatColor} roughness={0.5} />
+            </mesh>
+
+            {/* Step 3 (Upper Step concrete + seats) */}
+            <mesh position={isHorizontal ? [0, 0.75, -0.6] : [-0.6, 0.75, 0]} castShadow receiveShadow>
+              <boxGeometry args={isHorizontal ? [stand.size[0], 0.3, 0.35] : [0.35, 0.3, stand.size[1]]} />
+              <meshStandardMaterial color={stand.color} roughness={0.8} />
+            </mesh>
+            <mesh position={isHorizontal ? [0, 0.91, -0.55] : [-0.55, 0.91, 0]} castShadow>
+              <boxGeometry args={isHorizontal ? [stand.size[0] - 0.1, 0.06, 0.2] : [0.2, 0.06, stand.size[1] - 0.1]} />
+              <meshStandardMaterial color={stand.seatColor} roughness={0.5} />
+            </mesh>
+          </group>
+        );
+      })}
+
+      {/* Concrete corner blocks linking the stands together */}
+      {[[4.5, 3.8], [-4.5, 3.8], [4.5, -3.8], [-4.5, -3.8]].map(([cx, cz], i) => (
+        <mesh key={i} position={[cx, 0.45, cz]} castShadow>
+          <boxGeometry args={[0.8, 0.9, 0.8]} />
+          <meshStandardMaterial color="#1e1b4b" roughness={0.9} />
+        </mesh>
+      ))}
+
+      {/* Outer Concrete boundary wall */}
+      <mesh position={[0, 0.5, 0]}>
+        <cylinderGeometry args={[6.4, 6.4, 1.0, 32, 1, true]} />
+        <meshStandardMaterial color="#0f0f1b" roughness={0.9} side={2} />
+      </mesh>
+
+      {/* Canopy Roof Ring hovering on top */}
+      <mesh position={[0, 1.3, 0]} rotation={[Math.PI / 2, 0, 0]}>
+        <ringGeometry args={[4.8, 6.4, 32]} />
+        <meshStandardMaterial color="#0b0b14" roughness={0.9} side={2} />
+      </mesh>
+
+      {/* ── Floodlight Towers (4 corners) with detailed bulb arrays ── */}
+      {[[6.4, 4.6], [-6.4, 4.6], [6.4, -4.6], [-6.4, -4.6]].map(([tx, tz], i) => (
+        <group key={i} position={[tx, 0, tz]}>
+          {/* Main Lattice column */}
+          <mesh position={[0, 2.5, 0]} castShadow>
+            <cylinderGeometry args={[0.08, 0.15, 5, 8]} />
+            <meshStandardMaterial color="#2d2d44" metalness={0.8} roughness={0.3} />
+          </mesh>
+          {/* Bulb head rack */}
+          <mesh position={[0, 5.0, 0]}>
+            <boxGeometry args={[0.5, 0.35, 0.5]} />
+            <meshStandardMaterial color="#1f1f2e" />
+          </mesh>
+          {/* Emissive spotlight bulb array */}
+          <mesh position={[0, 5.0, 0.18]}>
+            <boxGeometry args={[0.4, 0.25, 0.1]} />
+            <meshStandardMaterial color="#fef08a" emissive="#fbbf24" emissiveIntensity={3.0} />
+          </mesh>
+        </group>
+      ))}
+
+      {/* ── Dynamic Rain particle system ── */}
+      {isRaining && <RainParticles />}
+
+      {/* ── 3D Gate Beacons & Labels ── */}
+      {gates.map((g) => {
+        const coord = gate3DPositions[g.id];
+        if (!coord) return null;
+
+        const isSelected = selectedGateId === g.id;
+        const isHovered = hoveredGateId === g.id;
+        const rColor = riskColors[g.riskLevel];
+        const showDynamicGlow = g.riskLevel === 'high' || g.riskLevel === 'critical';
+
+        return (
+          <group key={g.id} position={[coord.x, coord.y, coord.z]}>
+            {/* 3D Gate Doorways structure */}
+            <group
+              onClick={(e) => {
+                e.stopPropagation();
+                if (onGateClick) onGateClick(g.id);
+              }}
+              onPointerOver={(e) => {
+                e.stopPropagation();
+                setHoveredGateId(g.id);
+              }}
+              onPointerOut={(e) => {
+                e.stopPropagation();
+                setHoveredGateId(null);
+              }}
+            >
+              {/* Left Pillar Column (Light concrete gray) */}
+              <mesh position={[-0.22, 0.2, 0]} castShadow>
+                <boxGeometry args={[0.07, 0.5, 0.1]} />
+                <meshStandardMaterial color="#a1a1aa" roughness={0.4} />
+              </mesh>
+              {/* Right Pillar Column */}
+              <mesh position={[0.22, 0.2, 0]} castShadow>
+                <boxGeometry args={[0.07, 0.5, 0.1]} />
+                <meshStandardMaterial color="#a1a1aa" roughness={0.4} />
+              </mesh>
+              {/* Top cross beam */}
+              <mesh position={[0, 0.45, 0]} castShadow>
+                <boxGeometry args={[0.51, 0.08, 0.1]} />
+                <meshStandardMaterial color="#71717a" roughness={0.4} />
+              </mesh>
+              {/* Glowing entry turnstile door panel */}
+              <mesh position={[0, 0.2, 0]}>
+                <boxGeometry args={[0.36, 0.38, 0.02]} />
+                <meshStandardMaterial
+                  color={rColor.fill}
+                  emissive={rColor.glow}
+                  emissiveIntensity={isSelected ? 3.0 : isHovered ? 2.0 : rColor.glowIntensity * 1.5}
+                  transparent
+                  opacity={0.88}
+                  roughness={0.2}
+                />
+              </mesh>
+            </group>
+
+            {/* Glowing spot light under beacon for critical/high states */}
+            {showDynamicGlow && (
+              <pointLight
+                position={[0, 0.1, 0]}
+                color={rColor.glow}
+                intensity={isSelected ? 3.5 : 2.0}
+                distance={5}
+              />
+            )}
+
+            {/* Selection ring in 3D */}
+            {isSelected && (
+              <mesh position={[0, -0.05, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+                <ringGeometry args={[0.3, 0.42, 16]} />
+                <meshBasicMaterial color={isSimple ? '#fbbf24' : '#818cf8'} side={2} />
+              </mesh>
+            )}
+
+            {/* Floating label overlay */}
+            <Html
+              position={[0, 0.9, 0]}
+              center
+              distanceFactor={8}
+              className="pointer-events-none select-none z-10"
+            >
+              <button
+                onClick={() => onGateClick && onGateClick(g.id)}
+                className={`flex items-center justify-center font-mono font-black text-center rounded-full text-xs transition-all pointer-events-auto shadow-md
+                  ${isSelected ? 'h-7 w-7 border-2' : 'h-6 w-6 border'}
+                `}
+                style={{
+                  backgroundColor: rColor.fill,
+                  borderColor: isSelected ? (isSimple ? '#fbbf24' : '#818cf8') : rColor.stroke,
+                  color: rColor.text,
+                  boxShadow: showDynamicGlow ? `0 0 10px ${rColor.glow}` : 'none'
+                }}
+                aria-label={`Gate ${coord.label} status: ${g.riskLevel}`}
+              >
+                {coord.label}
+              </button>
+            </Html>
+          </group>
+        );
+      })}
+    </>
+  );
+};
+
+// ─── Procedural Rain Particle System ───
+const RainParticles: React.FC = () => {
+  const count = 180;
+  const meshRef = useRef<THREE.Points>(null);
+
+  const [positions, speeds] = useMemo(() => {
+    const pos = new Float32Array(count * 3);
+    const spds = new Float32Array(count);
+    let seed = 12345;
+    const pseudoRandom = () => {
+      seed = (seed * 1664525 + 1013904223) % 4294967296;
+      return seed / 4294967296;
+    };
+    for (let i = 0; i < count; i++) {
+      pos[i * 3]     = (pseudoRandom() - 0.5) * 16;
+      pos[i * 3 + 1] = pseudoRandom() * 8;
+      pos[i * 3 + 2] = (pseudoRandom() - 0.5) * 16;
+      spds[i] = 0.1 + pseudoRandom() * 0.15;
+    }
+    return [pos, spds];
+  }, []);
+
+  // Frame tick animation for rain drops
+  useEffect(() => {
+    let animationFrameId: number;
+    const tick = () => {
+      if (meshRef.current) {
+        const geo = meshRef.current.geometry;
+        const posAttr = geo.attributes.position;
+        if (posAttr) {
+          const arr = posAttr.array as Float32Array;
+          for (let i = 0; i < count; i++) {
+            arr[i * 3 + 1] -= speeds[i]; // move down
+            if (arr[i * 3 + 1] < 0) {
+              arr[i * 3 + 1] = 8; // reset to top
+            }
+          }
+          posAttr.needsUpdate = true;
+        }
+      }
+      animationFrameId = requestAnimationFrame(tick);
+    };
+    tick();
+    return () => cancelAnimationFrame(animationFrameId);
+  }, [speeds]);
+
+  return (
+    <points ref={meshRef}>
+      <bufferGeometry>
+        <bufferAttribute
+          attach="attributes-position"
+          args={[positions, 3]}
+        />
+      </bufferGeometry>
+      <pointsMaterial
+        color="#a5f3fc"
+        size={0.06}
+        transparent
+        opacity={0.6}
+      />
+    </points>
+  );
+};
+
+// ─── MAIN PORTAL CONTAINER COMPONENT ─────────────────────────────────────────
 export const StadiumTwinDiagram: React.FC<StadiumTwinDiagramProps> = ({
   stadiumContext,
   onGateClick,
@@ -60,6 +484,11 @@ export const StadiumTwinDiagram: React.FC<StadiumTwinDiagramProps> = ({
   variant = 'detailed',
 }) => {
   const [hoveredGateId, setHoveredGateId] = useState<string | null>(null);
+  const [webglSupported, setWebglSupported] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    setWebglSupported(isWebGLAvailable());
+  }, []);
 
   if (!stadiumContext) {
     return (
@@ -71,41 +500,10 @@ export const StadiumTwinDiagram: React.FC<StadiumTwinDiagramProps> = ({
 
   const { gates = [], weather } = stadiumContext;
   const isSimple = variant === 'simple';
-
-  // ─── Gate positions — unchanged from 4C-3 ─────────────────────────────────────
-  const gateCoordinates: Record<string, { x: number; y: number; label: string; name: string }> = {
-    'gate-a': { x: 250, y: 48,  label: 'A', name: 'North Stand' },
-    'gate-b': { x: 392, y: 88,  label: 'B', name: 'North-East' },
-    'gate-c': { x: 448, y: 200, label: 'C', name: 'East Stand' },
-    'gate-d': { x: 392, y: 312, label: 'D', name: 'South-East' },
-    'gate-e': { x: 250, y: 352, label: 'E', name: 'South Stand' },
-    'gate-f': { x: 108, y: 312, label: 'F', name: 'South-West' },
-    'gate-g': { x: 52,  y: 200, label: 'G', name: 'West Stand' },
-    'gate-h': { x: 108, y: 88,  label: 'H', name: 'North-West' },
-  };
-
-  // ─── Risk color palettes ───────────────────────────────────────────────────────
-  // Detailed (Operations): clinical indigo/amber/orange/red — Phase 5A tokens
-  const detailedRiskColors: Record<RiskLevel, { stroke: string; fill: string; glowColor: string; text: string; filterId: string }> = {
-    low:      { stroke: '#52526a', fill: '#16162a', glowColor: 'rgba(82,82,106,0)',  text: '#9090a8', filterId: 'glow-low-d'      },
-    moderate: { stroke: '#818cf8', fill: '#312e81', glowColor: 'rgba(129,140,248,0.7)', text: '#c7d2fe', filterId: 'glow-mod-d'      },
-    high:     { stroke: '#fbbf24', fill: '#78350f', glowColor: 'rgba(251,191,36,0.9)', text: '#fde68a', filterId: 'glow-high-d'     },
-    critical: { stroke: '#f87171', fill: '#450a0a', glowColor: 'rgba(248,113,113,1.0)', text: '#fecaca', filterId: 'glow-crit-d' },
-  };
-
-  // Simple (Fan): warmer palette, critical softened to amber, same structure
-  const simpleRiskColors: Record<RiskLevel, { stroke: string; fill: string; glowColor: string; text: string; filterId: string }> = {
-    low:      { stroke: '#34d399', fill: '#022c22', glowColor: 'rgba(52,211,153,0)',   text: '#6ee7b7', filterId: 'glow-low-s'      },
-    moderate: { stroke: '#60a5fa', fill: '#1e3a8a', glowColor: 'rgba(96,165,250,0.6)', text: '#bfdbfe', filterId: 'glow-mod-s'      },
-    high:     { stroke: '#fbbf24', fill: '#78350f', glowColor: 'rgba(251,191,36,0.8)', text: '#fde68a', filterId: 'glow-high-s'     },
-    critical: { stroke: '#fbbf24', fill: '#78350f', glowColor: 'rgba(251,191,36,0.9)', text: '#fde68a', filterId: 'glow-crit-s' }, // softened
-  };
-
   const riskColors = isSimple ? simpleRiskColors : detailedRiskColors;
 
-  // ─── Weather icon ──────────────────────────────────────────────────────────────
-  const getWeatherIcon = (cond?: string) => {
-    switch (cond) {
+  const WeatherIcon = (() => {
+    switch (weather?.condition) {
       case 'clear':       return Sun;
       case 'cloudy':      return Cloud;
       case 'light-rain':
@@ -113,721 +511,147 @@ export const StadiumTwinDiagram: React.FC<StadiumTwinDiagramProps> = ({
       case 'storm':       return CloudLightning;
       default:            return Cloud;
     }
-  };
-  const WeatherIcon = getWeatherIcon(weather?.condition);
-  const isRaining = weather?.condition === 'light-rain' || weather?.condition === 'heavy-rain' || weather?.condition === 'storm';
-  const isCloudy  = weather?.condition === 'cloudy';
+  })();
 
-  // ─── Colour scheme for the illustration layers ────────────────────────────────
-  // All tones use the midnight blue-black base from Phase 5A
-  const c = {
-    outerWall:   '#0d0d1a',   // darker than bg-base — the outer structural concrete
-    tier3:       '#12122a',   // outermost seating band (upper deck)
-    tier2:       '#1a1a3a',   // middle seating band
-    tier1:       '#1e1e42',   // inner seating band (closest to pitch)
-    tierLine:    'rgba(255,255,255,0.04)',   // individual "seat row" lines
-    canopy:      '#0a0a16',   // roof/canopy shadow ring
-    canopyEdge:  'rgba(255,255,255,0.06)',  // canopy edge highlight
-    pitchBase:   '#0d3320',   // deep green for pitch base
-    pitchLight:  '#0f4428',   // lighter mown stripe tone
-    pitchDark:   '#0b2e1c',   // darker mown stripe tone
-    pitchMark:   'rgba(255,255,255,0.60)',  // pitch markings — not pure white
-    pitchMarkFaint: 'rgba(255,255,255,0.30)', // secondary markings
-    stemColor:   'rgba(255,255,255,0.12)',  // gate stem connecting to bowl
-    tower:       '#1c1c3a',   // floodlight tower body
-    towerLight:  '#fbbf24',   // floodlight warm glow
-  };
-
-  // In simple/fan mode, slightly warmer tones
-  if (isSimple) {
-    c.tier3 = '#111128';
-    c.tier2 = '#17172e';
-    c.tier1 = '#1c1c36';
-    c.pitchBase  = '#0e3822';
-    c.pitchLight = '#115430';
+  // Loading state
+  if (webglSupported === null) {
+    return (
+      <div className="h-[420px] rounded-large border border-[rgba(255,255,255,0.07)] bg-bg-card/20 flex flex-col items-center justify-center text-text-muted text-xs gap-3">
+        <RefreshCw className="w-6 h-6 animate-spin text-blue-500" />
+        <span>Initializing 3D Stadium Twin Scene...</span>
+      </div>
+    );
   }
 
   return (
-    <div
-      className={[
-        'relative w-full overflow-hidden select-none transition-all duration-medium',
-        isSimple
-          ? 'border border-[rgba(255,255,255,0.07)] bg-bg-card p-4 rounded-large shadow-[var(--shadow-low)]'
-          : 'border border-[rgba(255,255,255,0.07)] bg-bg-base p-6 rounded-2xl shadow-[var(--shadow-high)]',
-      ].join(' ')}
-    >
-      {/* ── Scene ambient vignette (very subtle dark corners, gives depth) ── */}
-      <div
-        aria-hidden="true"
-        className="absolute inset-0 pointer-events-none z-10"
-        style={{
-          background: 'radial-gradient(ellipse at 50% 50%, transparent 55%, rgba(8,8,14,0.7) 100%)',
-        }}
-      />
-
-      {/* ── Weather ambient overlay ── */}
-      {isCloudy && (
-        <div
-          aria-hidden="true"
-          className="absolute inset-0 pointer-events-none z-10"
-          style={{
-            background: 'radial-gradient(ellipse at 50% 30%, rgba(80,80,120,0.12) 0%, transparent 65%)',
-          }}
-        />
-      )}
-
-      {/* ── Weather corner badge ── */}
-      {weather && (
-        <div
-          className={[
-            'absolute top-4 right-4 z-20 flex items-center gap-2 px-3 py-1.5 rounded-full',
-            'text-[10px] font-medium font-sans tracking-wide',
-            'backdrop-blur-md border',
-            isSimple
-              ? 'border-[rgba(255,255,255,0.10)] bg-bg-secondary/80 text-text-secondary'
-              : 'border-[rgba(255,255,255,0.08)] bg-[rgba(14,14,23,0.80)] text-[#9090a8]',
-          ].join(' ')}
-        >
-          <IconWrapper icon={WeatherIcon} size="sm" className="text-primary-400 shrink-0" />
-          <span className="capitalize">{weather.condition.replace(/-/g, ' ')}</span>
-        </div>
-      )}
-
-      {/* ── Title ── */}
-      <div className="absolute top-4 left-5 z-20">
-        <span
-          className={[
-            'text-[9px] font-mono tracking-[0.18em] uppercase block',
-            isSimple ? 'text-primary-400' : 'text-[#52526a]',
-          ].join(' ')}
-        >
-          {isSimple ? 'Stadium Map' : 'Twin Visualizer'}
-        </span>
-        <h3
-          className={[
-            'text-xs font-bold mt-0.5',
-            isSimple ? 'text-text-primary' : 'text-[#9090a8]',
-          ].join(' ')}
-        >
-          {isSimple ? 'Select Your Entry Gate' : 'Interactive Spatial Map'}
-        </h3>
+    <div className="flex flex-col relative w-full">
+      {/* Accessible parallel summary list for screen-readers (never visual-only) */}
+      <div className="sr-only">
+        <h2>Accessible Stadium Gate Summary</h2>
+        <ul>
+          {gates.map((g) => (
+            <li key={g.id}>
+              Gate {g.id.replace('gate-', '').toUpperCase()}: Status {g.riskLevel}, Occupancy {g.occupancyPercent}%, Queue estimate {g.queueEstimate} people.
+            </li>
+          ))}
+        </ul>
       </div>
 
-      {/* ════════════════════════════════════════════════════════════════
-          SVG DIAGRAM — 500×400 viewbox
-          Layout:
-            Outer structural perimeter:  rx=130 stadium oval
-            Canopy shadow ring:          slightly inset, very dark
-            3 seating tier bands:        each with fine row-line texture
-            Floodlight towers:           4 corners, structural tabs
-            Pitch:                       mown-stripe gradient, full markings
-            Gate markers:                stem + SVG-filter glow + label
-            Rain overlay:                CSS-animated SVG lines (if raining)
-      ════════════════════════════════════════════════════════════════ */}
-      <svg
-        viewBox="0 0 500 400"
-        className="w-full h-auto max-h-[380px] mx-auto mt-7 relative z-10"
-        aria-label="Stadium aerial view diagram showing all entry gates"
-        role="img"
-      >
-        <defs>
-          {/* ── CSS Animations (SVG-native — run outside React cycle) ── */}
-          <style>{`
-            @keyframes pulseRing {
-              0%   { r: 0;  opacity: 0.8; }
-              70%  { r: 14; opacity: 0;   }
-              100% { r: 14; opacity: 0;   }
-            }
-            @keyframes pulseRingLg {
-              0%   { r: 0;  opacity: 0.8; }
-              70%  { r: 18; opacity: 0;   }
-              100% { r: 18; opacity: 0;   }
-            }
-            .pulse-ring {
-              transform-box: fill-box;
-              transform-origin: center;
-              animation: pulseRing 2.2s cubic-bezier(0.2,0,0.8,1) infinite;
-            }
-            .pulse-ring-lg {
-              transform-box: fill-box;
-              transform-origin: center;
-              animation: pulseRingLg 2.2s cubic-bezier(0.2,0,0.8,1) infinite;
-            }
-            .pulse-ring-delay {
-              animation-delay: 1.1s;
-            }
-            @keyframes rainFall {
-              0%   { transform: translateY(-40px) translateX(0px);  opacity: 0.6; }
-              100% { transform: translateY(440px) translateX(-80px); opacity: 0.2; }
-            }
-            .rain-line { animation: rainFall 1.4s linear infinite; }
-            .rain-line:nth-child(2) { animation-delay: -0.2s; }
-            .rain-line:nth-child(3) { animation-delay: -0.5s; }
-            .rain-line:nth-child(4) { animation-delay: -0.7s; }
-            .rain-line:nth-child(5) { animation-delay: -1.0s; }
-            .rain-line:nth-child(6) { animation-delay: -0.3s; }
-            .rain-line:nth-child(7) { animation-delay: -0.9s; }
-            .rain-line:nth-child(8) { animation-delay: -0.15s; }
-
-            @keyframes towerPulse {
-              0%, 100% { opacity: 0.8; }
-              50%       { opacity: 1.0; }
-            }
-            .tower-light { animation: towerPulse 3s ease-in-out infinite; }
-          `}</style>
-
-          {/* ── SVG Filter glows for gate markers ── */}
-          {/* moderate glow */}
-          <filter id="glow-mod-d" x="-60%" y="-60%" width="220%" height="220%">
-            <feGaussianBlur stdDeviation="3" result="blur" />
-            <feFlood floodColor="#818cf8" floodOpacity="0.7" result="color" />
-            <feComposite in="color" in2="blur" operator="in" result="colorBlur" />
-            <feMerge><feMergeNode in="colorBlur" /><feMergeNode in="SourceGraphic" /></feMerge>
-          </filter>
-          <filter id="glow-mod-s" x="-60%" y="-60%" width="220%" height="220%">
-            <feGaussianBlur stdDeviation="3" result="blur" />
-            <feFlood floodColor="#60a5fa" floodOpacity="0.6" result="color" />
-            <feComposite in="color" in2="blur" operator="in" result="colorBlur" />
-            <feMerge><feMergeNode in="colorBlur" /><feMergeNode in="SourceGraphic" /></feMerge>
-          </filter>
-          {/* high glow */}
-          <filter id="glow-high-d" x="-70%" y="-70%" width="240%" height="240%">
-            <feGaussianBlur stdDeviation="4.5" result="blur" />
-            <feFlood floodColor="#fbbf24" floodOpacity="0.85" result="color" />
-            <feComposite in="color" in2="blur" operator="in" result="colorBlur" />
-            <feMerge><feMergeNode in="colorBlur" /><feMergeNode in="SourceGraphic" /></feMerge>
-          </filter>
-          <filter id="glow-high-s" x="-70%" y="-70%" width="240%" height="240%">
-            <feGaussianBlur stdDeviation="4" result="blur" />
-            <feFlood floodColor="#fbbf24" floodOpacity="0.75" result="color" />
-            <feComposite in="color" in2="blur" operator="in" result="colorBlur" />
-            <feMerge><feMergeNode in="colorBlur" /><feMergeNode in="SourceGraphic" /></feMerge>
-          </filter>
-          {/* critical glow — strongest */}
-          <filter id="glow-crit-d" x="-80%" y="-80%" width="260%" height="260%">
-            <feGaussianBlur stdDeviation="5.5" result="blur" />
-            <feFlood floodColor="#f87171" floodOpacity="1.0" result="color" />
-            <feComposite in="color" in2="blur" operator="in" result="colorBlur" />
-            <feMerge><feMergeNode in="colorBlur" /><feMergeNode in="SourceGraphic" /></feMerge>
-          </filter>
-          <filter id="glow-crit-s" x="-80%" y="-80%" width="260%" height="260%">
-            <feGaussianBlur stdDeviation="5" result="blur" />
-            <feFlood floodColor="#fbbf24" floodOpacity="0.9" result="color" />
-            <feComposite in="color" in2="blur" operator="in" result="colorBlur" />
-            <feMerge><feMergeNode in="colorBlur" /><feMergeNode in="SourceGraphic" /></feMerge>
-          </filter>
-          {/* no-glow placeholder for low risk */}
-          <filter id="glow-low-d" /><filter id="glow-low-s" />
-
-          {/* ── Pitch ambient glow (radial, behind pitch, scene lighting) ── */}
-          <radialGradient id="pitchAmbient" cx="50%" cy="50%" r="50%">
-            <stop offset="0%"   stopColor="#1a5c35" stopOpacity="0.5" />
-            <stop offset="100%" stopColor="#0d3320" stopOpacity="0" />
-          </radialGradient>
-
-          {/* ── Mown stripe pattern (alternating opacity bands) ── */}
-          <pattern id="mownStripes" x="0" y="0" width="10" height="80" patternUnits="userSpaceOnUse">
-            <rect x="0" y="0"  width="10" height="80" fill="#0f4428" />
-            <rect x="0" y="0"  width="10" height="10" fill="#0d3c24" />
-            <rect x="0" y="20" width="10" height="10" fill="#0d3c24" />
-            <rect x="0" y="40" width="10" height="10" fill="#0d3c24" />
-            <rect x="0" y="60" width="10" height="10" fill="#0d3c24" />
-          </pattern>
-
-          {/* ── Seating row-line texture (fine radial lines within tiers) ── */}
-          <pattern id="seatRows" x="0" y="0" width="8" height="8" patternUnits="userSpaceOnUse">
-            <line x1="0" y1="0" x2="8" y2="0" stroke="rgba(255,255,255,0.035)" strokeWidth="0.5" />
-          </pattern>
-
-          {/* ── Pitch edge shadow (inner vignette) ── */}
-          <radialGradient id="pitchEdgeShadow" cx="50%" cy="50%" r="50%">
-            <stop offset="70%" stopColor="rgba(0,0,0,0)"     />
-            <stop offset="100%" stopColor="rgba(0,0,0,0.5)" />
-          </radialGradient>
-
-          {/* ── Scene background gradient ── */}
-          <radialGradient id="sceneBg" cx="50%" cy="50%" r="50%">
-            <stop offset="0%"   stopColor="#0e0e1a" />
-            <stop offset="100%" stopColor="#08080e" />
-          </radialGradient>
-
-          {/* ── Canopy gradient (dark ring with subtle edge highlight) ── */}
-          <radialGradient id="canopyGrad" cx="50%" cy="50%" r="50%">
-            <stop offset="0%"   stopColor="#10101e" stopOpacity="0" />
-            <stop offset="80%"  stopColor="#10101e" stopOpacity="0" />
-            <stop offset="90%"  stopColor="#0a0a16" stopOpacity="0.9" />
-            <stop offset="100%" stopColor="#0a0a16" stopOpacity="1" />
-          </radialGradient>
-
-          {/* ── Outer structural ring gradient ── */}
-          <radialGradient id="outerWallGrad" cx="50%" cy="35%" r="55%">
-            <stop offset="0%"  stopColor="#1a1a3a" />
-            <stop offset="100%" stopColor="#0a0a16" />
-          </radialGradient>
-        </defs>
-
-        {/* ════════════════════════════════════════
-            LAYER 0: Scene background
-        ════════════════════════════════════════ */}
-        <rect x="0" y="0" width="500" height="400" fill="url(#sceneBg)" />
-
-        {/* Soft ambient glow behind the pitch center */}
-        <ellipse cx="250" cy="200" rx="120" ry="80" fill="rgba(20,80,45,0.25)" />
-
-        {/* ════════════════════════════════════════
-            LAYER 1: Outer structural perimeter
-            The outermost architectural boundary —
-            the stadium's concrete/structural wall
-        ════════════════════════════════════════ */}
-        <ellipse
-          cx="250" cy="200"
-          rx="195" ry="165"
-          fill="url(#outerWallGrad)"
-          stroke="rgba(255,255,255,0.06)"
-          strokeWidth="1"
-        />
-
-        {/* ════════════════════════════════════════
-            LAYER 2: Seating tier bands
-            3 concentric bands stepping inward,
-            each slightly lighter and with seat-row
-            texture overlay suggesting real rows.
-        ════════════════════════════════════════ */}
-
-        {/* Tier 3 — upper deck (outermost band) */}
-        <ellipse
-          cx="250" cy="200"
-          rx="175" ry="148"
-          fill={c.tier3}
-          stroke="rgba(255,255,255,0.05)"
-          strokeWidth="0.5"
-        />
-        {/* Seat-row texture overlay — upper deck */}
-        <ellipse
-          cx="250" cy="200"
-          rx="175" ry="148"
-          fill="url(#seatRows)"
-          opacity="0.8"
-        />
-
-        {/* Tier 2 — mid deck */}
-        <ellipse
-          cx="250" cy="200"
-          rx="150" ry="126"
-          fill={c.tier2}
-          stroke="rgba(255,255,255,0.06)"
-          strokeWidth="0.5"
-        />
-        {/* Seat-row texture overlay — mid deck */}
-        <ellipse
-          cx="250" cy="200"
-          rx="150" ry="126"
-          fill="url(#seatRows)"
-          opacity="0.7"
-        />
-
-        {/* Tier 1 — lower deck (inner, closest to pitch) */}
-        <ellipse
-          cx="250" cy="200"
-          rx="124" ry="104"
-          fill={c.tier1}
-          stroke="rgba(255,255,255,0.07)"
-          strokeWidth="0.5"
-        />
-        {/* Seat-row texture overlay — lower deck */}
-        <ellipse
-          cx="250" cy="200"
-          rx="124" ry="104"
-          fill="url(#seatRows)"
-          opacity="0.6"
-        />
-
-        {/* Canopy shadow ring — implies a roof overhanging the upper tier */}
-        <ellipse
-          cx="250" cy="200"
-          rx="190" ry="160"
-          fill="none"
-          stroke={c.canopyEdge}
-          strokeWidth="6"
-          opacity="0.5"
-        />
-        {/* Canopy inner shadow */}
-        <ellipse
-          cx="250" cy="200"
-          rx="183" ry="153"
-          fill="none"
-          stroke="rgba(0,0,0,0.4)"
-          strokeWidth="3"
-        />
-
-        {/* ════════════════════════════════════════
-            LAYER 3: Floodlight tower structures
-            4 corner positions around the bowl.
-            Small structural shapes that read as
-            architectural elements, not UI controls.
-        ════════════════════════════════════════ */}
-        {[
-          { cx: 90,  cy: 85  },  // NW
-          { cx: 410, cy: 85  },  // NE
-          { cx: 410, cy: 315 },  // SE
-          { cx: 90,  cy: 315 },  // SW
-        ].map((tower, i) => (
-          <g key={`tower-${i}`} aria-hidden="true">
-            {/* Tower base — small structural square */}
-            <rect
-              x={tower.cx - 6}
-              y={tower.cy - 6}
-              width="12"
-              height="12"
-              rx="2"
-              fill={c.tower}
-              stroke="rgba(255,255,255,0.12)"
-              strokeWidth="0.75"
+      {/* Main visualization container */}
+      <div className="relative h-[360px] md:h-[420px] rounded-large overflow-hidden border border-zinc-800 bg-[#070710] shadow-2xl">
+        {webglSupported ? (
+          // ─── ThreeJS / React Three Fiber 3D Canvas ───
+          <Canvas
+            shadows
+            camera={{ position: [0, 6.5, 9.5], fov: 45 }}
+            style={{ pointerEvents: 'auto' }}
+          >
+            <color attach="background" args={['#070710']} />
+            <Stadium3DModel
+              gates={gates}
+              weather={weather}
+              onGateClick={onGateClick}
+              selectedGateId={selectedGateId}
+              variant={variant}
+              hoveredGateId={hoveredGateId}
+              setHoveredGateId={setHoveredGateId}
             />
-            {/* Tower arm — diagonal bar reaching to edge */}
-            <line
-              x1={tower.cx}
-              y1={tower.cy}
-              x2={250}
-              y2={200}
-              stroke="rgba(255,255,255,0.04)"
-              strokeWidth="0.5"
+            <OrbitControls
+              enablePan={!isSimple}
+              enableZoom={true}
+              enableRotate={true}
+              minDistance={5}
+              maxDistance={15}
+              minPolarAngle={0.1}
+              maxPolarAngle={Math.PI / 2.2} // prevent going below the ground plane
+              autoRotate={isSimple}
+              autoRotateSpeed={0.3}
             />
-            {/* Floodlight cluster — 4 tiny warm-white dots */}
-            {[-3, 0, 3].map((dx) => (
-              <circle
-                key={dx}
-                cx={tower.cx + dx}
-                cy={tower.cy - 8}
-                r="1.5"
-                fill={c.towerLight}
-                className="tower-light"
-                opacity="0.8"
-              />
-            ))}
-            {/* Warm glow halo around floodlights */}
-            <circle
-              cx={tower.cx}
-              cy={tower.cy - 8}
-              r="6"
-              fill="rgba(251,191,36,0.08)"
-            />
-          </g>
-        ))}
+          </Canvas>
+        ) : (
+          // ─── Lightweight 2D SVG Fallback for devices without WebGL ───
+          <div className="relative w-full h-full flex items-center justify-center p-4">
+            <svg
+              viewBox="0 0 500 400"
+              className="w-full h-full max-h-[380px]"
+              aria-hidden="true"
+            >
+              {/* Outer Concrete boundary shadow */}
+              <ellipse cx="250" cy="200" rx="215" ry="165" fill="#0d0d1a" stroke="rgba(255,255,255,0.03)" strokeWidth="1" />
+              
+              {/* Seating stands tiers */}
+              <ellipse cx="250" cy="200" rx="195" ry="145" fill={isSimple ? '#111128' : '#12122a'} stroke="rgba(255,255,255,0.04)" />
+              <ellipse cx="250" cy="200" rx="175" ry="125" fill={isSimple ? '#17172e' : '#1a1a3a'} stroke="rgba(255,255,255,0.04)" />
+              <ellipse cx="250" cy="200" rx="155" ry="105" fill={isSimple ? '#1c1c36' : '#1e1e42'} stroke="rgba(255,255,255,0.04)" />
 
-        {/* ════════════════════════════════════════
-            LAYER 4: Central football pitch
-            Mown-stripe texture via pattern fill.
-            Full correct markings.
-            Inner vignette/shadow at edges.
-        ════════════════════════════════════════ */}
-        <g id="football-pitch" aria-hidden="true">
-          {/* Pitch ambient glow behind it */}
-          <ellipse cx="250" cy="200" rx="90" ry="58" fill="url(#pitchAmbient)" />
+              {/* Pitch layout */}
+              <rect x="175" y="140" width="150" height="120" fill={isSimple ? '#0e3822' : '#0d3320'} rx="2" />
+              <rect x="175" y="140" width="150" height="120" stroke="rgba(255,255,255,0.5)" strokeWidth="1" fill="none" />
+              <line x1="250" y1="140" x2="250" y2="260" stroke="rgba(255,255,255,0.5)" />
+              <circle cx="250" cy="200" r="24" fill="none" stroke="rgba(255,255,255,0.5)" />
 
-          {/* Pitch base — mown-stripe fill */}
-          <rect
-            x="158" y="152"
-            width="184" height="96"
-            rx="3"
-            fill="url(#mownStripes)"
-          />
+              {/* Draw 2D Gate Markers */}
+              {gates.map((g) => {
+                const coord = gate2DCoordinates[g.id];
+                if (!coord) return null;
+                const isSelected = selectedGateId === g.id;
+                const colors = riskColors[g.riskLevel];
 
-          {/* Pitch outer shadow/vignette — recedes it under the stands */}
-          <rect
-            x="158" y="152"
-            width="184" height="96"
-            rx="3"
-            fill="url(#pitchEdgeShadow)"
-          />
-
-          {/* Pitch border line */}
-          <rect
-            x="158" y="152"
-            width="184" height="96"
-            rx="3"
-            fill="none"
-            stroke={c.pitchMark}
-            strokeWidth="1"
-          />
-
-          {/* Halfway line */}
-          <line
-            x1="250" y1="152"
-            x2="250" y2="248"
-            stroke={c.pitchMark}
-            strokeWidth="0.8"
-          />
-
-          {/* Center circle */}
-          <circle
-            cx="250" cy="200"
-            r="20"
-            fill="none"
-            stroke={c.pitchMark}
-            strokeWidth="0.8"
-          />
-
-          {/* Center spot */}
-          <circle cx="250" cy="200" r="1.5" fill={c.pitchMark} />
-
-          {/* Left penalty box */}
-          <rect
-            x="158" y="172"
-            width="28" height="56"
-            fill="none"
-            stroke={c.pitchMark}
-            strokeWidth="0.8"
-          />
-
-          {/* Left goal area (6-yard box) */}
-          <rect
-            x="158" y="184"
-            width="12" height="32"
-            fill="none"
-            stroke={c.pitchMarkFaint}
-            strokeWidth="0.7"
-          />
-
-          {/* Left goal (behind line) */}
-          <rect
-            x="152" y="188"
-            width="6" height="24"
-            fill="rgba(255,255,255,0.06)"
-            stroke={c.pitchMarkFaint}
-            strokeWidth="0.5"
-          />
-
-          {/* Left penalty spot */}
-          <circle cx="176" cy="200" r="1" fill={c.pitchMarkFaint} />
-
-          {/* Left penalty arc */}
-          <path
-            d="M 186,185 A 16,16 0 0 1 186,215"
-            fill="none"
-            stroke={c.pitchMarkFaint}
-            strokeWidth="0.7"
-          />
-
-          {/* Right penalty box */}
-          <rect
-            x="314" y="172"
-            width="28" height="56"
-            fill="none"
-            stroke={c.pitchMark}
-            strokeWidth="0.8"
-          />
-
-          {/* Right goal area (6-yard box) */}
-          <rect
-            x="330" y="184"
-            width="12" height="32"
-            fill="none"
-            stroke={c.pitchMarkFaint}
-            strokeWidth="0.7"
-          />
-
-          {/* Right goal (behind line) */}
-          <rect
-            x="342" y="188"
-            width="6" height="24"
-            fill="rgba(255,255,255,0.06)"
-            stroke={c.pitchMarkFaint}
-            strokeWidth="0.5"
-          />
-
-          {/* Right penalty spot */}
-          <circle cx="324" cy="200" r="1" fill={c.pitchMarkFaint} />
-
-          {/* Right penalty arc */}
-          <path
-            d="M 314,185 A 16,16 0 0 0 314,215"
-            fill="none"
-            stroke={c.pitchMarkFaint}
-            strokeWidth="0.7"
-          />
-
-          {/* Corner arcs */}
-          <path d="M 158,156 A 4,4 0 0 1 162,152" fill="none" stroke={c.pitchMarkFaint} strokeWidth="0.7" />
-          <path d="M 338,152 A 4,4 0 0 1 342,156" fill="none" stroke={c.pitchMarkFaint} strokeWidth="0.7" />
-          <path d="M 342,244 A 4,4 0 0 1 338,248" fill="none" stroke={c.pitchMarkFaint} strokeWidth="0.7" />
-          <path d="M 162,248 A 4,4 0 0 1 158,244" fill="none" stroke={c.pitchMarkFaint} strokeWidth="0.7" />
-        </g>
-
-        {/* ════════════════════════════════════════
-            LAYER 5: Rain overlay (weather ambient)
-            CSS-animated SVG lines — runs outside
-            React render cycle, no jank on rerender.
-            Only rendered when raining/storming.
-        ════════════════════════════════════════ */}
-        {isRaining && (
-          <g aria-hidden="true" opacity="0.35" clipPath="">
-            {[60, 130, 200, 270, 340, 410, 90, 180, 270, 360].map((x, i) => (
-              <line
-                key={`rain-${i}`}
-                x1={x}
-                y1="-20"
-                x2={x - 25}
-                y2="50"
-                stroke="rgba(147,197,253,0.6)"
-                strokeWidth="0.75"
-                className={`rain-line`}
-                style={{ animationDelay: `${-i * 0.15}s` }}
-              />
-            ))}
-          </g>
+                return (
+                  <g
+                    key={g.id}
+                    className="cursor-pointer transition-transform duration-medium hover:scale-110"
+                    onClick={() => onGateClick && onGateClick(g.id)}
+                    onMouseEnter={() => setHoveredGateId(g.id)}
+                    onMouseLeave={() => setHoveredGateId(null)}
+                  >
+                    <circle cx={coord.x} cy={coord.y} r={isSelected ? 14 : 11} fill={colors.fill} stroke={isSelected ? '#fbbf24' : colors.stroke} strokeWidth={2} />
+                    <text x={coord.x} y={coord.y + 4} textAnchor="middle" fontSize="10" fontWeight="bold" fill={colors.text}>{coord.label}</text>
+                  </g>
+                );
+              })}
+            </svg>
+          </div>
         )}
 
-        {/* ════════════════════════════════════════
-            LAYER 6: Gate markers
-            Each gate gets:
-            - A "stem" line from the bowl edge,
-              implying a physical gate/opening
-            - An SVG-filter glow for high/critical
-            - The pulse ring animation for alerts
-            - Large invisible touch target (mobile)
-            - Full keyboard/ARIA accessibility
-        ════════════════════════════════════════ */}
-        {gates.map((g) => {
-          const coord = gateCoordinates[g.id];
-          if (!coord) return null;
+        {/* ── Weather overlay badge inside the screen corner ── */}
+        <div className="absolute top-3 right-3 z-20 flex items-center gap-1.5 px-2.5 py-1.5 rounded-medium bg-zinc-950/80 border border-zinc-800 text-[10px] text-text-secondary select-none font-mono">
+          <IconWrapper icon={WeatherIcon} size="sm" className={weather?.condition === 'clear' ? 'text-amber-500' : 'text-blue-400'} />
+          <span className="capitalize">{weather?.condition.replace('-', ' ')}</span>
+          <span className="text-zinc-600">|</span>
+          <span>{weather?.temperatureCelsius}°C</span>
+        </div>
 
-          const colors      = riskColors[g.riskLevel] || riskColors.low;
-          const isSelected  = selectedGateId === g.id;
-          const isHovered   = hoveredGateId === g.id;
-          const needsPulse  = g.riskLevel === 'critical' || g.riskLevel === 'high';
-          const needsGlow   = g.riskLevel === 'critical' || g.riskLevel === 'high' || g.riskLevel === 'moderate';
+        {/* WebGL tag indicators in detailed Operations mode */}
+        {!isSimple && (
+          <div className="absolute bottom-3 left-3 z-20 px-2 py-1 rounded bg-zinc-950/80 border border-zinc-800 text-[8px] font-mono text-zinc-500 select-none">
+            WebGL 3D Twin Engine ACTIVE
+          </div>
+        )}
+      </div>
 
-          // Core radius — simple gets larger touch targets (unchanged from 4C-4)
-          const coreR = isSimple
-            ? (isSelected || isHovered ? 20 : 17)
-            : (isSelected || isHovered ? 15 : 13);
+      {/* Keyboard accessible list for accessibility compliance */}
+      <div className="mt-2 text-xs text-zinc-500 select-none">
+        <label htmlFor="keyboard-gate-select" className="mr-2 font-medium">Keyboard Gate Select:</label>
+        <select
+          id="keyboard-gate-select"
+          value={selectedGateId || ''}
+          onChange={(e) => onGateClick && onGateClick(e.target.value)}
+          className="bg-zinc-950 border border-zinc-800 text-zinc-300 rounded px-2.5 py-1"
+        >
+          <option value="">-- Choose Gate --</option>
+          {gates.map((g) => {
+            const coord = gate2DCoordinates[g.id];
+            return (
+              <option key={g.id} value={g.id}>
+                Gate {coord ? coord.label : g.id.toUpperCase()} ({coord ? coord.name : ''}) - Risk: {g.riskLevel}
+              </option>
+            );
+          })}
+        </select>
+      </div>
 
-          // Stem direction: from the gate outward away from center (250,200)
-          const dx   = coord.x - 250;
-          const dy   = coord.y - 200;
-          const dist = Math.sqrt(dx * dx + dy * dy);
-          const nx   = dx / dist;  // unit normal pointing outward
-          const ny   = dy / dist;
-
-          // Inner end of stem (at bowl surface ~radius 130 from center)
-          const stemLen = 12;
-          const stemInnerX = coord.x - nx * stemLen;
-          const stemInnerY = coord.y - ny * stemLen;
-
-          return (
-            <g
-              key={g.id}
-              tabIndex={0}
-              className="cursor-pointer focus:outline-none"
-              onClick={() => onGateClick?.(g.id)}
-              onMouseEnter={() => setHoveredGateId(g.id)}
-              onMouseLeave={() => setHoveredGateId(null)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault();
-                  onGateClick?.(g.id);
-                }
-              }}
-              aria-label={`Gate ${coord.label}: ${g.displayName}. ${translateGateRisk(g.riskLevel)}`}
-            >
-              {/* ── Invisible large touch target (mobile accessibility) ── */}
-              <circle cx={coord.x} cy={coord.y} r="28" fill="transparent" />
-
-              {/* ── Structural stem — connects marker to bowl edge ── */}
-              <line
-                x1={stemInnerX}
-                y1={stemInnerY}
-                x2={coord.x}
-                y2={coord.y}
-                stroke={isSelected ? colors.stroke : c.stemColor}
-                strokeWidth={isSelected ? 1.5 : 1}
-                strokeDasharray={isSelected ? 'none' : '3,2'}
-              />
-
-              {/* ── Pulse rings for alert states ── */}
-              {needsPulse && (
-                <>
-                  <circle
-                    cx={coord.x}
-                    cy={coord.y}
-                    r="0"
-                    fill="none"
-                    stroke={colors.stroke}
-                    strokeWidth="1.5"
-                    className={isSimple ? 'pulse-ring-lg' : 'pulse-ring'}
-                    style={{ animationDelay: '0s' }}
-                  />
-                  <circle
-                    cx={coord.x}
-                    cy={coord.y}
-                    r="0"
-                    fill="none"
-                    stroke={colors.stroke}
-                    strokeWidth="1"
-                    opacity="0.5"
-                    className={isSimple ? 'pulse-ring-lg' : 'pulse-ring'}
-                    style={{ animationDelay: '-1.1s' }}
-                  />
-                </>
-              )}
-
-              {/* ── Selection ring (when selected) ── */}
-              {isSelected && (
-                <circle
-                  cx={coord.x}
-                  cy={coord.y}
-                  r={coreR + 5}
-                  fill="none"
-                  stroke={isSimple ? '#fbbf24' : '#818cf8'}
-                  strokeWidth="1.5"
-                  strokeDasharray="4,3"
-                  opacity="0.7"
-                />
-              )}
-
-              {/* ── Core marker (with SVG filter glow for high/critical) ── */}
-              <circle
-                cx={coord.x}
-                cy={coord.y}
-                r={coreR}
-                fill={colors.fill}
-                stroke={isSelected ? (isSimple ? '#fbbf24' : '#818cf8') : colors.stroke}
-                strokeWidth={isSelected ? 2.5 : 2}
-                filter={needsGlow ? `url(#${colors.filterId})` : undefined}
-              />
-
-              {/* ── Inner highlight dot (premium depth touch) ── */}
-              <circle
-                cx={coord.x - coreR * 0.25}
-                cy={coord.y - coreR * 0.3}
-                r={coreR * 0.22}
-                fill="rgba(255,255,255,0.12)"
-              />
-
-              {/* ── Gate letter label ── */}
-              <text
-                x={coord.x}
-                y={coord.y + (isSimple ? 5 : 4)}
-                textAnchor="middle"
-                dominantBaseline="middle"
-                fontSize={isSimple ? '12' : '10'}
-                fontWeight="700"
-                fill={colors.text}
-                fontFamily="'JetBrains Mono', 'Fira Code', monospace"
-              >
-                {coord.label}
-              </text>
-            </g>
-          );
-        })}
-      </svg>
-
-      {/* ════════════════════════════════════════
-          INFO PANEL — unchanged from 4C-3/4C-4
-          All tooltip/detail content, gate status
-          and data display — functionally identical.
-      ════════════════════════════════════════ */}
+      {/* ─── INFO PANEL (identical props & rendering as flat SVG) ─── */}
       <div
         className={[
           'mt-4 p-4 rounded-large border backdrop-blur-sm min-h-[64px] flex items-center justify-between text-xs transition-all duration-fast',
@@ -840,7 +664,7 @@ export const StadiumTwinDiagram: React.FC<StadiumTwinDiagramProps> = ({
           (() => {
             const activeId = hoveredGateId || selectedGateId;
             const g = gates.find((gate) => gate.id === activeId);
-            const coord = g ? gateCoordinates[g.id] : null;
+            const coord = g ? gate2DCoordinates[g.id] : null;
             if (!g || !coord) return <span>Select a gate point to inspect…</span>;
 
             const isCritical = g.riskLevel === 'critical';
