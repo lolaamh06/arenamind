@@ -52,7 +52,7 @@ import type { GeminiRawResponse } from '../../types/reasoning';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const MODEL_NAME = 'gemini-2.5-flash';
+const MODEL_NAME = 'gemini-flash-latest';
 const TIMEOUT_MS = 30_000;
 const RETRY_DELAY_MS = 1_500;
 const MAX_ATTEMPTS = 2;
@@ -112,10 +112,73 @@ function resolveApiKey(): string {
 
 let _model: ReturnType<InstanceType<typeof GoogleGenerativeAI>['getGenerativeModel']> | null = null;
 
+// ─── GEMINI AUTHENTICATION SANITIZER ─────────────────────────────────────────
+// On cloud environments like Render, global credentials or proxy configurations
+// can inject an "Authorization: Bearer <token>" header into outgoing requests.
+// When calling the Gemini API (generativelanguage.googleapis.com) with a developer
+// API key (including the new "AQ." key format), Google's endpoint will reject it
+// with "ACCESS_TOKEN_TYPE_UNSUPPORTED" if the Authorization header is present.
+// We wrap globalThis.fetch to strip any conflicting "Authorization" header and
+// ensure the "x-goog-api-key" header is cleanly attached for Gemini endpoints.
+let _fetchSanitizerInstalled = false;
+function installFetchSanitizer(resolvedKey: string): void {
+  if (_fetchSanitizerInstalled || typeof globalThis.fetch !== 'function') return;
+  _fetchSanitizerInstalled = true;
+
+  // Unset environment variables that could cause Google's auth library to default
+  // to application credentials and inject Bearer tokens into outgoing requests.
+  delete process.env.GOOGLE_APPLICATION_CREDENTIALS;
+  delete process.env.GCLOUD_PROJECT;
+  delete process.env.GOOGLE_CLOUD_PROJECT;
+
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = ((
+    input: string | URL | Request,
+    init?: RequestInit,
+  ): Promise<Response> => {
+    const url = typeof input === 'string' ? input : input instanceof URL ? input.href : (input as Request).url;
+    if (url.includes('generativelanguage.googleapis.com')) {
+      // Create mutable headers from either init or Request object
+      const headers = new Headers(init?.headers ?? (input instanceof Request ? input.headers : {}));
+      
+      let modified = false;
+      if (headers.has('authorization') || headers.has('Authorization')) {
+        headers.delete('authorization');
+        headers.delete('Authorization');
+        modified = true;
+      }
+      
+      if (!headers.has('x-goog-api-key')) {
+        headers.set('x-goog-api-key', resolvedKey);
+        modified = true;
+      }
+
+      if (modified) {
+        if (init) {
+          init.headers = headers;
+        } else if (input instanceof Request) {
+          // For Request object, we must clone the request with new headers
+          const newRequest = new Request(input, { headers });
+          return originalFetch(newRequest);
+        } else {
+          // If input is string/URL and init is undefined, create init with headers
+          init = { headers };
+        }
+      }
+    }
+    return originalFetch(input as Parameters<typeof fetch>[0], init);
+  }) as typeof fetch;
+}
+// ─── END GEMINI AUTHENTICATION SANITIZER ─────────────────────────────────────
+
 function getModel() {
   if (_model) return _model;
 
   const key = resolveApiKey();
+
+  // Install fetch interceptor BEFORE constructing the client
+  installFetchSanitizer(key);
+
   const genAI = new GoogleGenerativeAI(key);
   _model = genAI.getGenerativeModel({
     model: MODEL_NAME,
